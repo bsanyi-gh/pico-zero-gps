@@ -74,4 +74,10 @@ template <typename T, size_t N> bool isZeroArray(T (&arr)[N]) {
  */
 uint16_t calcCRC16(const uint8_t *data, size_t length);
 
+/**
+ * @brief Ékezetes karakterek ASCII karakterekre konvertálása
+ * @param text A konvertálandó szöveg (in-place módosítás)
+ */
+void removeAccents(char *text);
+
 } // namespace Utils

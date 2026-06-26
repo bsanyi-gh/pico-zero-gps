@@ -27,6 +27,8 @@ SensorData c1_sharedSensorData = {0.0f, 0.0f, 0.0f, 0.0f};
 // Megosztott GPS adatok (Core 1 ír, Core 0 olvas)
 GpsData c1_sharedGpsData = {};
 
+#define CORE1_SENSOR_READ_INTERVAL_MS (30 * 1000UL) // 30 másodperc a szenzor mérési időköz
+
 /**
  * Core-1 szenzor olvasás, itt történik az ADC1 és ADC4 olvasása és a változók frissítése
  */
@@ -70,19 +72,17 @@ void setup1() {
  * @brief Core-1 fő ciklus, itt fut a szenzorok olvasása és a változók frissítése
  */
 
-#define SENSOR_READ_INTERVAL_MS (30 * 1000UL) // 30 másodperc a szenzor mérési időköz
-
 void loop1() {
 
     // GPS olvasás
     gpsManager->loop();
 
-    // Szenzorok karbantartása (DS18B20 non-blocking loop)
+    // Szenzorok olvasása és a változók frissítése
     sensorUtils.loop();
 
     // Mérés és megosztott adat frissítése (Core 1 az egyetlen írófél)
     static unsigned long lastSensorReadTime = 0;
-    Utils::timeHasPassed(lastSensorReadTime, SENSOR_READ_INTERVAL_MS, []() {
+    Utils::timeHasPassed(lastSensorReadTime, CORE1_SENSOR_READ_INTERVAL_MS, []() {
         readSensorsOnCore1();
         CORE1_DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", c1_sharedSensorData.vBus, c1_sharedSensorData.vSys, c1_sharedSensorData.coreTemperature, c1_sharedSensorData.externalTemperature);
     });

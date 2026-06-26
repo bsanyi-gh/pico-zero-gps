@@ -33,7 +33,7 @@ void debugWaitForSerial(TFT_eSPI &tft) {
  */
 void tftTouchCalibrate(TFT_eSPI &tft, uint16_t (&calData)[5]) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextFont(2);
+    tft.setTextFont(0);
     tft.setTextSize(2);
     const char *txt = "TFT touch kalibracio kell!\n";
     tft.setCursor((tft.width() - tft.textWidth(txt)) / 2, tft.height() / 2 - 60);
@@ -135,6 +135,76 @@ uint16_t calcCRC16(const uint8_t *data, size_t length) {
         }
     }
     return crc;
+}
+
+/**
+ * @brief ISO-8859-2 ékezetes karakterek cseréje
+ * Az ékezetes karaktereket az ASCII megfelelőjére cseréli.
+ * @param text A szöveg, amelyet módosítani kell
+ */
+void removeAccents(char *text) {
+
+    int len = strlen(text);
+
+    for (int i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)text[i];
+        switch (c) {
+            case 0xE1:
+                text[i] = 'a';
+                break; // á
+            case 0xE9:
+                text[i] = 'e';
+                break; // é
+            case 0xED:
+                text[i] = 'i';
+                break; // í
+            case 0xF3:
+                text[i] = 'o';
+                break; // ó
+            case 0xF6:
+                text[i] = 'o';
+                break; // ö
+            case 0xF5:
+                text[i] = 'o';
+                break; // ő
+            case 0xFA:
+                text[i] = 'u';
+                break; // ú
+            case 0xFC:
+                text[i] = 'u';
+                break; // ü
+            case 0xFB:
+                text[i] = 'u';
+                break; // ű
+            case 0xC1:
+                text[i] = 'A';
+                break; // Á
+            case 0xC9:
+                text[i] = 'E';
+                break; // É
+            case 0xCD:
+                text[i] = 'I';
+                break; // Í
+            case 0xD3:
+                text[i] = 'O';
+                break; // Ó
+            case 0xD6:
+                text[i] = 'O';
+                break; // Ö
+            case 0xD5:
+                text[i] = 'O';
+                break; // Ő
+            case 0xDA:
+                text[i] = 'U';
+                break; // Ú
+            case 0xDC:
+                text[i] = 'U';
+                break; // Ü
+            case 0xDB:
+                text[i] = 'U';
+                break; // Ű
+        }
+    }
 }
 
 } // namespace Utils

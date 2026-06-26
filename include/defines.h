@@ -13,14 +13,15 @@
 #endif
 
 // Core-1 debug engedélyezése de csak DEBUG módban
-#define __CORE1_DEBUG
+// #define __CORE1_DEBUG
 #if defined(__DEBUG) && defined(__CORE1_DEBUG)
 #define CORE1_DEBUG(fmt, ...) DEBUG("Core-1: " fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define CORE1_DEBUG(fmt, ...) // Üres makró, ha __DEBUG nincs definiálva
 #endif
 
-#define DEBUG_WAIT_FOR_SERIAL // Debug módban várakozás a soros port megnyitására
+// Debug módban várakozás a soros port megnyitására
+#define DEBUG_WAIT_FOR_SERIAL
 
 //---- Program Information ------------------------------------------
 
