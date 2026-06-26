@@ -266,7 +266,11 @@ void loop() {
     static unsigned long lastGpsDisplayTime = 0;
     Utils::timeHasPassed(lastGpsDisplayTime, GPS_DISPLAY_INTERVAL_MS, []() {
         // GPS adatok kiírása
-        DEBUG("GPS: valid=%d lat=%.6f lng=%.6f alt=%.1fm spd=%.1fkm/h crs=%.1f° sats=%d hdop=%.1f quality=%s mode=%s bootTime=%lus\n", (int)c1_sharedGpsData.locationValid, c1_sharedGpsData.lat, c1_sharedGpsData.lng,
+        DEBUG("GPS: satCnt=%d, valid=%d lat=%.6f lng=%.6f alt=%.1fm spd=%.1fkm/h crs=%.1f° sats=%d hdop=%.1f quality=%s mode=%s bootTime=%lus\n",
+              c1_sharedGpsData.satelliteCount,                                  //
+              (int)c1_sharedGpsData.locationValid,                              //
+              c1_sharedGpsData.lat,                                             //
+              c1_sharedGpsData.lng,                                             //
               c1_sharedGpsData.altitudeM,                                       //
               c1_sharedGpsData.speedKmph,                                       //
               c1_sharedGpsData.courseDeg,                                       //
