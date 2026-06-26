@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 
-#include "Config.h"
 #include "SensorUtils.h"
 #include "TftBackLightAdjuster.h"
 #include "Utils.h"
@@ -9,6 +8,7 @@
 #include "pins.h"
 
 //------------------ Config
+#include "Config.h"
 volatile bool configLoaded = false; // Jelezzük, hogy a config betöltődött
 
 //------------------ TFT
@@ -16,6 +16,7 @@ volatile bool configLoaded = false; // Jelezzük, hogy a config betöltődött
 TFT_eSPI tft;
 TftBackLightAdjuster tftBackLightAdjuster;
 
+//-------------------------------------------------------------------------
 /**
  * @brief Arduino setup() függvény
  */
