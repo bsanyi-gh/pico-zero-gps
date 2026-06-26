@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 
+#include "Config.h"
+#include "GpsManager.h"
 #include "SensorUtils.h"
 #include "TftBackLightAdjuster.h"
 #include "Utils.h"
@@ -8,11 +10,9 @@
 #include "pins.h"
 
 //------------------ Config
-#include "Config.h"
 volatile bool configLoaded = false; // Jelezzük, hogy a config betöltődött
 
 //------------------ TFT
-#include <TFT_eSPI.h>
 TFT_eSPI tft;
 TftBackLightAdjuster tftBackLightAdjuster;
 
@@ -92,8 +92,6 @@ void setup() {
 
     DEBUG("Core-0: setup(): System clock: %u MHz\n", (unsigned)clock_get_hz(clk_sys) / 1000000u);
 }
-
-#include "GpsManager.h"
 
 /**
  * @brief Arduino loop() függvény
