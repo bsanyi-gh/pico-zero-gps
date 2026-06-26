@@ -18,7 +18,7 @@ TftBackLightAdjuster tftBackLightAdjuster;
 
 //-------------------------------------------------------------------------
 /**
- * @brief Arduino setup() függvény
+ * @brief Arduino Core0 setup() függvény
  */
 void setup() {
 #ifdef __DEBUG
@@ -94,7 +94,7 @@ void setup() {
 }
 
 /**
- * @brief Arduino loop() függvény
+ * @brief Arduino Core0 loop() függvény
  */
 void loop() {
 
