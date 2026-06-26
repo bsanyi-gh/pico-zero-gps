@@ -44,8 +44,6 @@ void loop() {
 
 #define SENSOR_DISPLAY_INTERVAL_MS (30 * 1000UL) // 30 másodperc a szenzor adatok kiírási időköze
     static unsigned long lastDisplayTime = 0;
-    Utils::timeHasPassed(lastDisplayTime, SENSOR_DISPLAY_INTERVAL_MS, []() {
-        SensorData data = SensorData::get();
-        DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", data.vBus, data.vSys, data.coreTemperature, data.externalTemperature);
-    });
+    Utils::timeHasPassed(lastDisplayTime, SENSOR_DISPLAY_INTERVAL_MS,
+                         []() { DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", sharedSensorData.vBus, sharedSensorData.vSys, sharedSensorData.coreTemperature, sharedSensorData.externalTemperature); });
 }

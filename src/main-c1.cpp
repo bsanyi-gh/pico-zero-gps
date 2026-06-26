@@ -52,7 +52,10 @@ void loop1() {
         float coreT = sensorUtils.readCoreTemperature();
         float extT = sensorUtils.readExternalTemperature();
 
-        SensorData::write(vBus, vSys, coreT, extT);
+        sharedSensorData.vBus = vBus;
+        sharedSensorData.vSys = vSys;
+        sharedSensorData.coreTemperature = coreT;
+        sharedSensorData.externalTemperature = extT;
 
         CORE1_DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", vBus, vSys, coreT, extT);
     });

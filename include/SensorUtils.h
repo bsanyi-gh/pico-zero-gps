@@ -1,11 +1,12 @@
 #pragma once
 
-#include "defines.h"
-#include "pins.h"
 #include <Arduino.h>
 #include <DallasTemperature.h>
 #include <NonBlockingDallas.h>
 #include <OneWire.h>
+
+#include "defines.h"
+#include "pins.h"
 
 // Cache konstans
 #define SENSORS_CACHE_TIMEOUT_MS (5 * 1000) // 5 másodperc a cache idő
@@ -70,19 +71,12 @@ class SensorUtils {
 // Globális SensorUtils példány (csak Core 1 használja!)
 extern SensorUtils sensorUtils;
 
-/**
- * Megosztott szenzor adatok - Core 1 ír, Core 0 olvas.
- * A mutex kezelés belül történik, a hívó nem foglalkozik vele.
- */
+// Megosztott szenzor adatok - Core 1 ír, Core 0 olvas (volatile)
 struct SensorData {
-    float vBus;                // VBUS feszültség (V)
-    float vSys;                // VSYS feszültség (V)
-    float coreTemperature;     // Processzor hőmérséklete (°C)
-    float externalTemperature; // Külső hőmérséklet (°C)
-
-    /** Thread-safe írás (Core 1 hívja) */
-    static void write(float vBus, float vSys, float coreT, float extT);
-
-    /** Thread-safe olvasás (Core 0 hívja) */
-    static SensorData get();
+    volatile float vBus;
+    volatile float vSys;
+    volatile float coreTemperature;
+    volatile float externalTemperature;
 };
+
+extern SensorData sharedSensorData;

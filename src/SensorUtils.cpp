@@ -31,9 +31,8 @@ static NonBlockingDallas nonBlockingDallasTemp(&dallasTemp);
 // Statikus változók definíciói
 volatile float SensorUtils::externalTemperatureValue = 0.0f;
 
-// Megosztott szenzor adatok és mutex - privát implementációs részletek
-static SensorData sharedSensorData = {0.0f, 0.0f, 0.0f, 0.0f};
-static mutex_t sensorDataMutex;
+// Megosztott szenzor adatok (Core 1 ír, Core 0 olvas)
+SensorData sharedSensorData = {0.0f, 0.0f, 0.0f, 0.0f};
 
 /**
  * Konstruktor
@@ -66,9 +65,6 @@ void SensorUtils::init() {
 
     // Azonnal le is kérjük a hőmérsékletet
     nonBlockingDallasTemp.requestTemperature();
-
-    // Megosztott adat mutex inicializálása
-    mutex_init(&sensorDataMutex);
 }
 
 /**
@@ -161,35 +157,11 @@ float SensorUtils::readExternalTemperature() {
  * Loop - TIMEOUT VÉDELEMMEL
  */
 void SensorUtils::loop() {
-    static uint32_t lastUpdate = 0;
 
     // Max 10Hz frissítés (100ms minimális idő)
-    if (millis() - lastUpdate >= 100) {
+    static uint32_t lastUpdate = 0;
+    if (Utils::timeHasPassed(lastUpdate, 100)) {
         lastUpdate = millis();
         nonBlockingDallasTemp.update();
     }
-}
-
-// --- SensorData thread-safe metódusok ---
-
-/**
- * @brief Megosztott szenzor adatok írása
- * @details Core 1 írja, Core 0 olvassa. A mutex kezelése belül történik, a hívó nem foglalkozik vele.
- */
-void SensorData::write(float vBus, float vSys, float coreT, float extT) {
-    mutex_enter_blocking(&sensorDataMutex);
-    sharedSensorData = {vBus, vSys, coreT, extT};
-    mutex_exit(&sensorDataMutex);
-}
-
-/**
- * @brief Megosztott szenzor adatok olvasása
- * @details Core 0 olvassa, Core 1 írja. A mutex kezelése belül történik, a hívó nem foglalkozik vele.
- * @return A megosztott szenzor adatok másolata
- */
-SensorData SensorData::get() {
-    mutex_enter_blocking(&sensorDataMutex);
-    SensorData copy = sharedSensorData;
-    mutex_exit(&sensorDataMutex);
-    return copy;
 }
