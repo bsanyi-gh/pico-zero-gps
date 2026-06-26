@@ -29,59 +29,75 @@ TraffipaxManager traffipaxManager;
  */
 void drawSplashScreen() {
 
-    // Gradient háttér
+    // Gradient háttér - sötét kék → világos kék
     for (int y = 0; y < tft.height(); y++) {
-        uint16_t color = tft.color565(10, 30 + (y * 80) / tft.height(), 90 + (y * 120) / tft.height());
+        uint16_t color = tft.color565(0, 40 + (y * 60) / tft.height(), 80 + (y * 100) / tft.height());
         tft.drawFastHLine(0, y, tft.width(), color);
     }
 
     const int centerX = tft.width() / 2;
     const int titleY = tft.height() / 5;
-    const int subtitleY = titleY + 40;
+    const int subtitleY = titleY + 50;
     const int infoY = tft.height() - 80;
     const int countY = tft.height() - 18;
 
     tft.setTextDatum(MC_DATUM);
 
-    uint8_t titleSize = 5;
+    constexpr uint8_t titleSize = 5;
+
+    // Doboz mérete konstansok - könnyű hangolás
+    constexpr uint8_t TITLE_BOX_WIDTH_PADDING = 10; // Oldalsó padding - csökkentsd a keskenyebb dobozért
+    constexpr uint8_t TITLE_BOX_HEIGHT = 60;        // Doboz magassága - növeld a magasabbért
+    constexpr uint8_t TITLE_BOX_Y_OFFSET = 30;      // Y pozíció offset a centerből
 
     // Nagy cím árnyékkal és háttér sávval
     int titleWidth = tft.textWidth(PROGRAM_NAME, titleSize);
-    int titleBoxW = titleWidth + 30;
-    int titleBoxH = 32;
-    tft.fillRoundRect(centerX - titleBoxW / 2, titleY - 18, titleBoxW, titleBoxH, 8, TFT_WHITE);
-    tft.drawRoundRect(centerX - titleBoxW / 2, titleY - 18, titleBoxW, titleBoxH, 8, TFT_CYAN);
-    tft.setTextColor(TFT_BLACK);
+    int titleBoxW = titleWidth + TITLE_BOX_WIDTH_PADDING;
+    int titleBoxH = TITLE_BOX_HEIGHT;
+
+    // Árnyék effekt (sötét szürke eltolás)
+    tft.fillRoundRect(centerX - titleBoxW / 2 + 3, titleY - TITLE_BOX_Y_OFFSET + 3, titleBoxW, titleBoxH, 8, tft.color565(30, 30, 30));
+
+    // Fő doboz - sötét kék / fekete gradiens
+    tft.fillRoundRect(centerX - titleBoxW / 2, titleY - TITLE_BOX_Y_OFFSET, titleBoxW, titleBoxH, 8, tft.color565(0, 60, 120));
+    tft.drawRoundRect(centerX - titleBoxW / 2, titleY - TITLE_BOX_Y_OFFSET, titleBoxW, titleBoxH, 8, TFT_CYAN);
+    tft.drawRoundRect(centerX - titleBoxW / 2 + 1, titleY - TITLE_BOX_Y_OFFSET + 1, titleBoxW - 2, titleBoxH - 2, 8, tft.color565(100, 200, 255));
+
+    // Szöveg - fehér + árnyék
+    tft.setTextColor(tft.color565(30, 30, 30)); // Sötét árnyék
     tft.setTextSize(titleSize);
+    tft.drawString(PROGRAM_NAME, centerX + 1, titleY + 1);
+
+    tft.setTextColor(TFT_WHITE); // Fehér szöveg
     tft.drawString(PROGRAM_NAME, centerX, titleY);
 
-    // Alcím és leírás
+    // Alcím és leírás - sárga
     tft.setFreeFont(&FreeSans9pt7b);
     tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE);
+    tft.setTextColor(TFT_YELLOW);
     tft.drawString(PROGRAM_DESC, centerX, subtitleY);
 
     // Verzió és author
     tft.setTextDatum(BC_DATUM);
     tft.setTextSize(1);
-    tft.setTextColor(TFT_YELLOW);
+    tft.setTextColor(tft.color565(200, 200, 255)); // Világos kék
     tft.drawString(PROGRAM_VERSION, centerX, infoY);
     tft.setTextColor(TFT_CYAN);
     tft.drawString(PROGRAM_AUTHOR, centerX, infoY + 18);
 
-    // Build időpont és traffipax számláló
-    char buildBuffer[64];
-    snprintf(buildBuffer, sizeof(buildBuffer), "%s %s", __DATE__, __TIME__);
-    tft.setTextColor(TFT_LIGHTGREY);
-    tft.drawString(buildBuffer, centerX, countY - 14);
+    // Build időpont - halvány szürke
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%s %s", __DATE__, __TIME__);
+    tft.setTextColor(tft.color565(150, 150, 150));
+    tft.drawString(buffer, centerX, countY - 14);
 
-    char countBuffer[64];
-    snprintf(countBuffer, sizeof(countBuffer), "Traffipax count: %d", traffipaxManager.count());
+    // Traffipax számláló - nagy és világos
+    snprintf(buffer, sizeof(buffer), "Traffipax count: %d", traffipaxManager.count());
     tft.setFreeFont(&FreeSansBold12pt7b);
     tft.setTextSize(1);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawString(countBuffer, centerX, countY);
+    tft.setTextColor(tft.color565(255, 200, 0)); // Arany sárga
+    tft.drawString(buffer, centerX, countY);
 }
 
 /**
