@@ -5,6 +5,9 @@
 #include "defines.h"
 #include "pins.h"
 
+// A konfiguráció betöltődött a Core0-án?
+extern volatile bool configLoaded;
+
 // A Core-1-nek stack külön legyen a Core-0-tól
 // https://arduino-pico.readthedocs.io/en/latest/multicore.html#stack-sizes
 bool core1_separate_stack = true;
@@ -28,7 +31,10 @@ void readSensorsOnCore1() {
  */
 void setup1() {
 
-    delay(3000); // Várakozás a Core-0 indulására és inicializálására
+    // Várakozás a konfiguráció betöltésére, hogy a GPS-t be tudjuk állítani
+    while (!configLoaded) {
+        delay(100);
+    }
 
     // Szenzor inicializálása (mutex init is itt történik belül)
     sensorUtils.init();
@@ -36,7 +42,7 @@ void setup1() {
     // Első mérés a változók feltöltésére
     readSensorsOnCore1();
 
-    CORE1_DEBUG("core-1:setup1(): System clock: %u MHz\n", (unsigned)clock_get_hz(clk_sys) / 1000000u);
+    CORE1_DEBUG("setup1(): System clock: %u MHz\n", (unsigned)clock_get_hz(clk_sys) / 1000000u);
 }
 
 /**
