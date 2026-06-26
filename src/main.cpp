@@ -34,7 +34,7 @@ void setup() {
     Utils::debugWaitForSerial(tft);
 #endif
 
-    CORE1_DEBUG("core-1:setup1(): System clock: %u MHz\n", (unsigned)clock_get_hz(clk_sys) / 1000000u);
+    DEBUG("core-0:setup(): System clock: %u MHz\n", (unsigned)clock_get_hz(clk_sys) / 1000000u);
 }
 
 /**
@@ -44,6 +44,10 @@ void loop() {
 
 #define SENSOR_DISPLAY_INTERVAL_MS (30 * 1000UL) // 30 másodperc a szenzor adatok kiírási időköze
     static unsigned long lastDisplayTime = 0;
-    Utils::timeHasPassed(lastDisplayTime, SENSOR_DISPLAY_INTERVAL_MS,
-                         []() { DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", sharedSensorData.vBus, sharedSensorData.vSys, sharedSensorData.coreTemperature, sharedSensorData.externalTemperature); });
+    Utils::timeHasPassed( //
+        lastDisplayTime,  //
+        SENSOR_DISPLAY_INTERVAL_MS,
+        []() { //
+            DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", sharedSensorData.vBus, sharedSensorData.vSys, sharedSensorData.coreTemperature, sharedSensorData.externalTemperature);
+        });
 }

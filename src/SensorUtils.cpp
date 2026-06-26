@@ -161,7 +161,7 @@ void SensorUtils::loop() {
     // Max 10Hz frissítés (100ms minimális idő)
     static uint32_t lastUpdate = 0;
     if (Utils::timeHasPassed(lastUpdate, 100)) {
-        lastUpdate = millis();
         nonBlockingDallasTemp.update();
+        lastUpdate = millis();
     }
 }
