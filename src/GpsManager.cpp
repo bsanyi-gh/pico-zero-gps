@@ -93,6 +93,7 @@ void GpsManager::updateSharedData() {
     c1_sharedGpsData.fixQuality = (uint8_t)gps.location.FixQuality();
     c1_sharedGpsData.fixMode = (uint8_t)gps.location.FixMode();
 
+    c1_sharedGpsData.speedValid = gps.speed.isValid() && gps.speed.age() < GPS_DATA_MAX_AGE;
     c1_sharedGpsData.speedKmph = gps.speed.kmph();
     c1_sharedGpsData.courseDeg = gps.course.deg();
     c1_sharedGpsData.altitudeM = gps.altitude.meters();

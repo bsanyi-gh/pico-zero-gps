@@ -3,6 +3,7 @@
 
 #include "Config.h"
 #include "GpsManager.h"
+#include "ScreenManager.h"
 #include "SensorUtils.h"
 #include "TftBackLightAdjuster.h"
 #include "TraffipaxManager.h"
@@ -21,6 +22,9 @@ TftBackLightAdjuster tftBackLightAdjuster;
 
 // TrafipaxManager példány, automatikusan betölti a CSV-t
 TraffipaxManager traffipaxManager;
+
+ScreenManager *screenManager = nullptr;
+IScreenManager **iScreenManager = (IScreenManager **)&screenManager; // A UIComponent használja
 
 //-------------------------------------------------------------------------
 
@@ -188,11 +192,11 @@ void setup() {
     // Még egy picit mutatjuk a splash screent
     delay(3000);
 
-    // // ScreenManager inicializálása itt, amikor minden más már kész
-    // if (screenManager == nullptr) {
-    //     screenManager = new ScreenManager();
-    // }
-    // screenManager->switchToScreen(SCREEN_NAME_MAIN); // A kezdő képernyőre kapcsolás
+    // ScreenManager inicializálása itt, amikor minden más már kész
+    if (screenManager == nullptr) {
+        screenManager = new ScreenManager();
+    }
+    screenManager->switchToScreen(SCREEN_NAME_EMPTY); // A kezdő képernyőre kapcsolás
 
     // Pittyentünk egyet, hogy üzemkészek vagyunk
     Utils::beepTick();
@@ -205,8 +209,52 @@ void setup() {
  */
 void loop() {
 
-    // TFT háttérvilágítás állítgatása a környezeti fényviszonyoknak megfelelően
-    tftBackLightAdjuster.loop();
+    //------------------- Touch esemény kezelése
+    uint16_t touchX, touchY;
+    bool touchedRaw = tft.getTouch(&touchX, &touchY);
+    bool validCoordinates = true;
+    if (touchedRaw) {
+        if (touchX > tft.width() || touchY > tft.height()) {
+            validCoordinates = false;
+        }
+    }
+
+    static bool lastTouchState = false;
+    static uint16_t lastTouchX = 0, lastTouchY = 0;
+    bool touched = touchedRaw && validCoordinates;
+
+    // Touch press event (immediate response)
+    if (touched && !lastTouchState) {
+        TouchEvent touchEvent(touchX, touchY, true);
+        screenManager->handleTouch(touchEvent);
+        lastTouchX = touchX;
+        lastTouchY = touchY;
+    } else if (!touched && lastTouchState) { // Touch release event (immediate response)
+        TouchEvent touchEvent(lastTouchX, lastTouchY, false);
+        screenManager->handleTouch(touchEvent);
+    }
+
+    lastTouchState = touched;
+
+    if (screenManager) {
+        // Deferred actions feldolgozása - biztonságos képernyőváltások végrehajtása
+        screenManager->loop();
+    }
+
+//------------------- EEPROM mentés figyelése
+#define EEPROM_SAVE_CHECK_INTERVAL 1000 * 60 * 5 // 5 perc
+    static uint32_t lastEepromSaveCheck = 0;
+    if (Utils::timeHasPassed(lastEepromSaveCheck, EEPROM_SAVE_CHECK_INTERVAL)) {
+        config.checkSave();
+        lastEepromSaveCheck = millis();
+    }
+
+    // Háttérvilágitás vezérlése - csak ha nem screensaver aktív
+    if (screenManager && !screenManager->isCurrentScreenScreensaver()) {
+        tftBackLightAdjuster.loop();
+    }
+
+    //---------------------------------------------------------------------------------------------------
 
 #define SENSOR_DISPLAY_INTERVAL_MS (30 * 1000UL)
     static unsigned long lastDisplayTime = 0;

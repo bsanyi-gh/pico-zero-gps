@@ -103,8 +103,11 @@ struct GpsData {
     volatile uint8_t fixMode;    // TinyGPSLocation::FixMode_t
 
     // Mozgás
+    volatile bool speedValid;
     volatile float speedKmph;
     volatile float courseDeg;
+
+    // Magasság
     volatile float altitudeM;
     volatile bool altitudeValid;
 
