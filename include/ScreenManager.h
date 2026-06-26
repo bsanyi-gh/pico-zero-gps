@@ -36,6 +36,7 @@ class ScreenManager : public IScreenManager {
     const char *previousScreenName;
     uint32_t lastActivityTime;
     uint32_t screenSaverTimeoutMs; // Kiszámolt képernyővédő időtúllépés ms-ben
+    uint32_t configCallbackId = 0; // Config callback ID a feliratkozáshoz
 
     // Navigációs stack - többszintű back navigációhoz
     std::vector<String> navigationStack;
@@ -52,6 +53,9 @@ class ScreenManager : public IScreenManager {
   public:
     // Képernyőkezelő osztály konstruktor
     ScreenManager();
+
+    // Destruktor
+    ~ScreenManager();
 
     // Aktuális képernyő lekérdezése
     std::shared_ptr<UIScreen> getCurrentScreen() const;

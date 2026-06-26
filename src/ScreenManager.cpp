@@ -10,7 +10,20 @@
 /**
  * @brief Konstruktor - regisztrálja az alapértelmezett képernyő factory-kat
  */
-ScreenManager::ScreenManager() : previousScreenName(nullptr), lastActivityTime(millis()) { registerDefaultScreenFactories(); }
+ScreenManager::ScreenManager() : previousScreenName(nullptr), lastActivityTime(millis()) {
+    // Feliratkozás a config változásokra
+    configCallbackId = config.registerChangeCallback([this]() { this->onConfigChanged(); });
+
+    registerDefaultScreenFactories();
+
+    // Kezdeti értékek beállítása
+    onConfigChanged();
+}
+
+/**
+ * @brief Destruktor - kijelentkezés a config callback-ből
+ */
+ScreenManager::~ScreenManager() { config.unregisterCallback(configCallbackId); }
 
 /**
  * @brief Alapértelmezett képernyő factory-k regisztrálása
