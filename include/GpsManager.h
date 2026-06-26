@@ -52,48 +52,13 @@ class GpsManager {
     /**
      * Thread-safe hozzáférés a műhold adatbázishoz UI számára (Core0)
      */
-    std::vector<SatelliteDb::SatelliteData> getSatelliteSnapshotForUI(SatelliteDb::SortType_t sortType = SatelliteDb::NONE) const {
-        //
-        return satelliteDb.getSnapshotForUI(sortType);
-    }
-    /**
-     * Thread-safe műholdak számának lekérdezése UI számára (Core0)
-     */
-    uint8_t getSatelliteCountForUI() const { return satelliteDb.countSatsForUI(); }
+    std::vector<SatelliteDb::SatelliteData> getSatelliteSnapshotForUI(SatelliteDb::SortType_t sortType = SatelliteDb::NONE) const { return satelliteDb.getSnapshotForUI(sortType); }
 
-    /**
-     * Thread-safe GPS adatok lekérdezése UI számára (Core0)
-     */
-    TinyGPSLocation getLocation() { return gps.location; }
-    TinyGPSInteger getSatellites() { return gps.satellites; }
-    TinyGPSHDOP getHdop() { return gps.hdop; }
-    TinyGPSSpeed getSpeed() { return gps.speed; }
-    TinyGPSDate getDate() { return gps.date; }
-    TinyGPSTime getTime() { return gps.time; }
-    TinyGPSCourse getCourse() { return gps.course; }
-    TinyGPSAltitude getAltitude() { return gps.altitude; }
+    /** GPS minőségi szint szövege (a sharedGpsData.fixQuality alapján) */
+    static String qualityToString(uint8_t fixQuality);
 
-    /**
-     * Helyi időzóna szerint korrigált dátum és idő lekérdezése (CET/CEST)
-     */
-    struct LocalDateTime {
-        uint8_t hour;
-        uint8_t minute;
-        uint8_t second;
-        bool timeValid;
-        uint8_t day;
-        uint8_t month;
-        uint16_t year;
-        bool dateValid;
-    };
-
-    LocalDateTime getLocalDateTime();
-    LocalDateTime getLocalTime() { return getLocalDateTime(); } // Alias
-
-    uint32_t getGpsBootTime() { return gpsBootTime; }
-
-    String getGpsQualityString();
-    String getGpsModeToString();
+    /** GPS üzemmód szövege (a sharedGpsData.fixMode alapján) */
+    static String modeToString(uint8_t fixMode);
 
   private:
     HardwareSerial &gpsSerial;
@@ -125,4 +90,41 @@ class GpsManager {
     size_t configCallbackId;
 
     void processGSVMessages();
+    void updateSharedData(); // sharedGpsData frissítése (Core 1 hívja)
 };
+
+// Megosztott GPS adatok - Core 1 ír, Core 0 olvas (volatile)
+struct GpsData {
+    // Pozíció
+    volatile bool locationValid;
+    volatile double lat;
+    volatile double lng;
+    volatile uint8_t fixQuality; // TinyGPSLocation::FixQuality_t
+    volatile uint8_t fixMode;    // TinyGPSLocation::FixMode_t
+
+    // Mozgás
+    volatile float speedKmph;
+    volatile float courseDeg;
+    volatile float altitudeM;
+    volatile bool altitudeValid;
+
+    // Műholdak és jel
+    volatile uint8_t satelliteCount;
+    volatile float hdop;
+
+    // Helyi dátum és idő (CET/CEST korrigált)
+    volatile uint8_t hour;
+    volatile uint8_t minute;
+    volatile uint8_t second;
+    volatile bool timeValid;
+    volatile uint8_t day;
+    volatile uint8_t month;
+    volatile uint16_t year;
+    volatile bool dateValid;
+
+    // Az első valid fix-ig eltelt indulási idő (másodperc)
+    volatile uint32_t gpsBootTime;
+};
+
+// main-c1-ben definiálva van a változó, hogy Core1 írja, Core0 olvassa
+extern GpsData c1_sharedGpsData;

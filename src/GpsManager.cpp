@@ -28,7 +28,8 @@ CRGB leds[INTERNAL_RGB_LED_NUM];
 constexpr uint8_t MAX_SATELLITES = 50;
 
 /**
- * Konstruktor
+ * @brief Konstruktor
+ * @param serial A GPS soros port referenciája
  */
 GpsManager::GpsManager(HardwareSerial &serial) : gpsSerial(serial) {
     // Feliratkozás a config változásokra
@@ -83,51 +84,59 @@ void GpsManager::onConfigChanged() {
 }
 
 /**
- * Helyi időzóna szerint korrigált dátum és idő lekérdezése (CET/CEST)
+ * @brief Frissíti a megosztott GPS adatokat (Core 1 hívja)
  */
-GpsManager::LocalDateTime GpsManager::getLocalDateTime() {
+void GpsManager::updateSharedData() {
+    c1_sharedGpsData.locationValid = gps.location.isValid() && gps.location.age() < GPS_DATA_MAX_AGE;
+    c1_sharedGpsData.lat = gps.location.lat();
+    c1_sharedGpsData.lng = gps.location.lng();
+    c1_sharedGpsData.fixQuality = (uint8_t)gps.location.FixQuality();
+    c1_sharedGpsData.fixMode = (uint8_t)gps.location.FixMode();
 
-    // Visszatérési érték
-    LocalDateTime result = {0, 0, 0, false, 0, 0, 0, false};
+    c1_sharedGpsData.speedKmph = gps.speed.kmph();
+    c1_sharedGpsData.courseDeg = gps.course.deg();
+    c1_sharedGpsData.altitudeM = gps.altitude.meters();
+    c1_sharedGpsData.altitudeValid = gps.altitude.isValid();
 
-    // Érvényes GPS időadatok másolása
-    if (gps.time.isValid() && gps.time.age() < GPS_DATA_MAX_AGE) {
-        // Sanity check the values
-        if (gps.time.hour() <= 23 && gps.time.minute() <= 59 && gps.time.second() <= 59) {
-            result.hour = gps.time.hour();
-            result.minute = gps.time.minute();
-            result.second = gps.time.second();
-            result.timeValid = true;
-        }
+    c1_sharedGpsData.satelliteCount = gps.satellites.isValid() ? (uint8_t)gps.satellites.value() : 0;
+    c1_sharedGpsData.hdop = gps.hdop.isValid() ? (float)gps.hdop.hdop() : 99.9f;
+
+    c1_sharedGpsData.timeValid = false;
+    if (gps.time.isValid() && gps.time.age() < GPS_DATA_MAX_AGE && gps.time.hour() <= 23 && gps.time.minute() <= 59 && gps.time.second() <= 59) {
+        c1_sharedGpsData.hour = gps.time.hour();
+        c1_sharedGpsData.minute = gps.time.minute();
+        c1_sharedGpsData.second = gps.time.second();
+        c1_sharedGpsData.timeValid = true;
+    }
+    c1_sharedGpsData.dateValid = false;
+    if (gps.date.isValid() && gps.date.age() < GPS_DATA_MAX_AGE && gps.date.year() > 2020 && gps.date.year() < 2100 && gps.date.month() >= 1 && gps.date.month() <= 12 && gps.date.day() >= 1 && gps.date.day() <= 31) {
+        c1_sharedGpsData.day = gps.date.day();
+        c1_sharedGpsData.month = gps.date.month();
+        c1_sharedGpsData.year = gps.date.year();
+        c1_sharedGpsData.dateValid = true;
+    }
+    if (c1_sharedGpsData.dateValid && c1_sharedGpsData.timeValid) {
+        uint8_t h = c1_sharedGpsData.hour, m = c1_sharedGpsData.minute;
+        uint8_t d = c1_sharedGpsData.day, mo = c1_sharedGpsData.month;
+        uint16_t y = c1_sharedGpsData.year;
+        DaylightSaving::correctTime(m, h, d, mo, y);
+        c1_sharedGpsData.hour = h;
+        c1_sharedGpsData.minute = m;
+        c1_sharedGpsData.day = d;
+        c1_sharedGpsData.month = mo;
+        c1_sharedGpsData.year = y;
     }
 
-    // Érvényes GPS dátumok másolása
-    if (gps.date.isValid() && gps.date.age() < GPS_DATA_MAX_AGE) {
-        // Sanity check the values
-        if (gps.date.year() > 2020 && gps.date.year() < 2100 && gps.date.month() >= 1 && gps.date.month() <= 12 && gps.date.day() >= 1 && gps.date.day() <= 31) {
-            result.day = gps.date.day();
-            result.month = gps.date.month();
-            result.year = gps.date.year();
-            result.dateValid = true;
-        }
-    }
-
-    // Ha érvényesek a GPS adatok, akkor nyári/téli időszámítás korrekciót is végrehajtunk
-    if (result.dateValid && result.timeValid) {
-
-        // Nyári/téli időszámítás korrekció
-        DaylightSaving::correctTime(result.minute, result.hour, result.day, result.month, result.year);
-    }
-
-    return result;
+    c1_sharedGpsData.gpsBootTime = gpsBootTime;
 }
 
 /**
- * GPS minőségi szint lekérdezése
+ * @brief Fix quality értékének szöveges reprezentációja
+ * @param fixQuality A fix quality értéke
+ * @return A fix quality szöveges reprezentációja
  */
-String GpsManager::getGpsQualityString() {
-
-    switch (gps.location.FixQuality()) {
+String GpsManager::qualityToString(uint8_t fixQuality) {
+    switch (fixQuality) {
         case TinyGPSLocation::Invalid:
             return "Invalid";
         case TinyGPSLocation::GPS:
@@ -152,10 +161,12 @@ String GpsManager::getGpsQualityString() {
 }
 
 /**
- * GPS üzemmód lekérdezése
+ * @brief Fix mode értékének szöveges reprezentációja
+ * @param fixMode A fix mode értéke
+ * @return A fix mode szöveges reprezentációja
  */
-String GpsManager::getGpsModeToString() {
-    switch (gps.location.FixMode()) {
+String GpsManager::modeToString(uint8_t fixMode) {
+    switch (fixMode) {
         case TinyGPSLocation::N:
             return "No Fix";
         case TinyGPSLocation::A:
@@ -170,7 +181,7 @@ String GpsManager::getGpsModeToString() {
 }
 
 /**
- * Read GSV messages from the GPS module
+ * @brief Read GSV messages from the GPS module
  */
 void GpsManager::processGSVMessages() {
 
@@ -219,7 +230,7 @@ void GpsManager::processGSVMessages() {
 }
 
 /**
- * GPS olvasása
+ * @brief GPS olvasása
  */
 void GpsManager::loop() {
 
@@ -242,6 +253,9 @@ void GpsManager::loop() {
 
         // GPS mondatok feldolgozása
         processGSVMessages();
+
+        // Megosztott adatok frissítése (Core 0 olvassa)
+        updateSharedData();
 
         // GPS boot idő számítása (első érvényes műholdadat)
         if (gpsBootTime == 0 && gps.satellites.isValid() && gps.satellites.age() < GPS_DATA_MAX_AGE && gps.satellites.value() > 0) {

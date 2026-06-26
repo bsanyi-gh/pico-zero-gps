@@ -31,9 +31,6 @@ static NonBlockingDallas nonBlockingDallasTemp(&dallasTemp);
 // Statikus változók definíciói
 volatile float SensorUtils::externalTemperatureValue = 0.0f;
 
-// Megosztott szenzor adatok (Core 1 ír, Core 0 olvas)
-SensorData sharedSensorData = {0.0f, 0.0f, 0.0f, 0.0f};
-
 /**
  * Konstruktor
  */

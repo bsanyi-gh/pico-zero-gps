@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#include "GpsManager.h"
+#include "SensorUtils.h"
 #include "Utils.h"
 #include "defines.h"
 #include "pins.h"
@@ -12,12 +14,18 @@ bool core1_separate_stack = true;
 extern volatile bool configLoaded;
 
 // -------------------- SensorUtils
-#include "SensorUtils.h"
 SensorUtils sensorUtils;
 
 // -------------------- GPS
-#include "GpsManager.h"
 GpsManager *gpsManager = nullptr;
+
+//-------------------- Megosztott adatok (Core 1 ír, Core 0 olvas)
+
+// Megosztott szenzor adatok (Core 1 ír, Core 0 olvas)
+SensorData c1_sharedSensorData = {0.0f, 0.0f, 0.0f, 0.0f};
+
+// Megosztott GPS adatok (Core 1 ír, Core 0 olvas)
+GpsData c1_sharedGpsData = {};
 
 /**
  * Core-1 szenzor olvasás, itt történik az ADC1 és ADC4 olvasása és a változók frissítése
@@ -25,10 +33,10 @@ GpsManager *gpsManager = nullptr;
 void readSensorsOnCore1() {
 
     // Mérés és megosztott adat frissítése (Core 1 az egyetlen írófél)
-    sharedSensorData.vBus = sensorUtils.readVBusExternal();
-    sharedSensorData.vSys = sensorUtils.readVSysExternal();
-    sharedSensorData.coreTemperature = sensorUtils.readCoreTemperature();
-    sharedSensorData.externalTemperature = sensorUtils.readExternalTemperature();
+    c1_sharedSensorData.vBus = sensorUtils.readVBusExternal();
+    c1_sharedSensorData.vSys = sensorUtils.readVSysExternal();
+    c1_sharedSensorData.coreTemperature = sensorUtils.readCoreTemperature();
+    c1_sharedSensorData.externalTemperature = sensorUtils.readExternalTemperature();
 }
 
 /**
@@ -76,7 +84,7 @@ void loop1() {
     static unsigned long lastSensorReadTime = 0;
     Utils::timeHasPassed(lastSensorReadTime, SENSOR_READ_INTERVAL_MS, []() {
         readSensorsOnCore1();
-        CORE1_DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", sharedSensorData.vBus, sharedSensorData.vSys, sharedSensorData.coreTemperature, sharedSensorData.externalTemperature);
+        CORE1_DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", c1_sharedSensorData.vBus, c1_sharedSensorData.vSys, c1_sharedSensorData.coreTemperature, c1_sharedSensorData.externalTemperature);
     });
 
     sleep_ms(5);

@@ -79,4 +79,5 @@ struct SensorData {
     volatile float externalTemperature;
 };
 
-extern SensorData sharedSensorData;
+// main-c1-ben definiálva van a változó, hogy Core1 írja, Core0 olvassa
+extern SensorData c1_sharedSensorData;
