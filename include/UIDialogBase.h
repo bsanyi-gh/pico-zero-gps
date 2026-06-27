@@ -43,6 +43,7 @@ class UIDialogBase : public UIContainerComponent {
     // Dialógus elrendezési konstansok
     static constexpr uint16_t HEADER_HEIGHT = 28;                                  // Fejléc magassága
     static constexpr uint16_t PADDING = 5;                                         // Belső margó
+    static constexpr uint16_t BUTTONS_GAP = 2;                                     // Gombok közötti rés
     static constexpr uint16_t BORDER_RADIUS = 8;                                   // Saroklekerekítés
     static constexpr uint16_t CLOSE_BUTTON_SIZE = HEADER_HEIGHT - 2 * PADDING - 2; // Bezáró gomb mérete
     static constexpr uint16_t VEIL_COLOR = TFT_DARKGREY;                           // Fátyol színe (lehetne tft.color565(30,30,30) egy sötétebbért)

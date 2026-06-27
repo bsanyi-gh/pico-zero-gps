@@ -16,8 +16,8 @@ class UIButton : public UIComponent {
 
   public:
     // Alapértelmezett gomb méretek
-    static constexpr uint16_t DEFAULT_BUTTON_WIDTH = 72;       // Alapértelmezett gomb szélesség
-    static constexpr uint16_t DEFAULT_BUTTON_HEIGHT = 35;      // Alapértelmezett gomb magasság
+    static constexpr uint16_t DEFAULT_BUTTON_WIDTH = 48;       // Alapértelmezett gomb szélesség
+    static constexpr uint16_t DEFAULT_BUTTON_HEIGHT = 24;      // Alapértelmezett gomb magasság
     static constexpr uint16_t HORIZONTAL_TEXT_PADDING = 2 * 8; // 8px padding a szöveg mindkét oldalán
     static constexpr uint16_t BUTTON_TOUCH_MARGIN = 6;         // Gomb érintési érzékenység margója
 
@@ -57,7 +57,7 @@ class UIButton : public UIComponent {
     ButtonType buttonType = ButtonType::Pushable;
     ButtonState currentState = ButtonState::Off;
     bool autoSizeToText = false;
-    bool useMiniFont = false;
+    bool useMiniFont = true; // Alapértelmezett a kisebb font használata, hogy a gombok kompaktabbak legyenek
     uint32_t pressStartTime = 0;
     bool longPressThresholdMet = false; // Jelzi, ha a hosszú lenyomás küszöbét elértük
 
@@ -165,7 +165,7 @@ class UIButton : public UIComponent {
         if (useMiniFont) {
             tft.setFreeFont();
         } else {
-            tft.setFreeFont(&FreeSansBold9pt7b);
+            tft.setFreeFont(&FreeSans9pt7b);
         }
 
         uint16_t textW = (strlen(label) > 0) ? tft.textWidth(label) : 0;
@@ -231,7 +231,7 @@ class UIButton : public UIComponent {
         if (btnUseMiniFont) {
             ::tft.setFreeFont();
         } else {
-            ::tft.setFreeFont(&FreeSansBold9pt7b);
+            ::tft.setFreeFont(&FreeSans9pt7b);
         }
         uint16_t textW = strlen(text) > 0 ? ::tft.textWidth(text) : 0;
         uint16_t calculatedWidth = textW + HORIZONTAL_TEXT_PADDING;
@@ -416,7 +416,7 @@ class UIButton : public UIComponent {
             if (useMiniFont) {
                 tft.setFreeFont();
             } else {
-                tft.setFreeFont(&FreeSansBold9pt7b);
+                tft.setFreeFont(&FreeSans9pt7b);
             }
 
             tft.setTextColor(currentDrawColors.text);
@@ -569,5 +569,9 @@ class UIButton : public UIComponent {
         }
     }
 
+    /**
+     * @brief Lekéri a gomb érintési margóját.
+     * @return A gomb érintési margója (BUTTON_TOUCH_MARGIN)
+     */
     virtual int16_t getTouchMargin() const override { return BUTTON_TOUCH_MARGIN; }
 };

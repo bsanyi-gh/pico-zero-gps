@@ -80,4 +80,14 @@ uint16_t calcCRC16(const uint8_t *data, size_t length);
  */
 void removeAccents(char *text);
 
+/**
+ * @brief Egy lebegőpontos számot formáz char bufferbe, a tizedesjegyek számát paraméterként adva meg.
+ * @param value A lebegőpontos szám értéke
+ * @param decimalPlaces A tizedesjegyek száma
+ * @param buffer A kimeneti buffer (min. 16 karakter ajánlott)
+ * @param bufferSize A buffer mérete
+ * @return A buffer pointere a kényelmesebb használatért
+ */
+char *floatToString(float value, int decimalPlaces, char *buffer, size_t bufferSize);
+
 } // namespace Utils

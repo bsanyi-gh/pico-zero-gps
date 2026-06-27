@@ -1,11 +1,12 @@
 #include "ScreenManager.h"
 #include "GpsManager.h"
 
+// Főképernyők
 #include "ScreenScreenSaver.h"
 
 // Fejlesztői képernyők
 #include "ScreenEmpty.h"
-// #include "ScreenTest.h"
+#include "ScreenTest.h"
 
 /**
  * @brief Konstruktor - regisztrálja az alapértelmezett képernyő factory-kat
@@ -34,7 +35,7 @@ void ScreenManager::registerDefaultScreenFactories() {
     registerScreenFactory(SCREEN_NAME_SCREENSAVER, []() { return std::make_shared<ScreenScreenSaver>(); });
 
     // Teszt képernyők regisztrálása
-    // registerScreenFactory(SCREEN_NAME_TEST, []() { return std::make_shared<ScreenTest>(); });
+    registerScreenFactory(SCREEN_NAME_TEST, []() { return std::make_shared<ScreenTest>(); });
     registerScreenFactory(SCREEN_NAME_EMPTY, []() { return std::make_shared<ScreenEmpty>(); });
 }
 

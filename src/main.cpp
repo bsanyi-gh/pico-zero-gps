@@ -196,7 +196,7 @@ void setup() {
     if (screenManager == nullptr) {
         screenManager = new ScreenManager();
     }
-    screenManager->switchToScreen(SCREEN_NAME_EMPTY); // A kezdő képernyőre kapcsolás
+    screenManager->switchToScreen(SCREEN_NAME_TEST); // A kezdő képernyőre kapcsolás
 
     // Pittyentünk egyet, hogy üzemkészek vagyunk
     Utils::beepTick();

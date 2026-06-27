@@ -42,8 +42,8 @@
 #define SCREEN_NAME_SCREENSAVER "ScreenScreenSaver"
 
 //---
-#define SCREEN_NAME_EMPTY "Empty"
 #define SCREEN_NAME_TEST "Test"
+#define SCREEN_NAME_EMPTY "Empty"
 
 // Képernyővédő deaktiválásához szükséges sebesség km/h-ban
 #define SCREEN_HIDE_SCREENSAVER_SPEED_KMPH 3.0f
