@@ -411,6 +411,12 @@ class UIButton : public UIComponent {
 
         tft.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, CORNER_RADIUS, currentDrawColors.border);
 
+        // Mini-fontos Toggleable ON gombnál extra belső keret, hogy 2px vastag legyen a zöld kiemelés.
+        if (!isDisabled() && buttonType == ButtonType::Toggleable && useMiniFont && currentState == ButtonState::On && bounds.width > 2 && bounds.height > 2) {
+            uint8_t innerRadius = (CORNER_RADIUS > 0) ? static_cast<uint8_t>(CORNER_RADIUS - 1) : 0;
+            tft.drawRoundRect(bounds.x + 1, bounds.y + 1, bounds.width - 2, bounds.height - 2, innerRadius, this->currentButtonScheme.ledOnColor);
+        }
+
         if (label != nullptr) {
             tft.setTextSize(1);
             if (useMiniFont) {

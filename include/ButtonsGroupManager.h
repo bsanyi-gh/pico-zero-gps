@@ -18,6 +18,7 @@ struct ButtonGroupDefinition {
     UIButton::ButtonState initialState = UIButton::ButtonState::Off; // Kezdeti állapot (alapértelmezetten Off)
     uint16_t width = 0;                                              // Egyedi szélesség (0 = auto-méretezés a szöveghez)
     uint16_t height = 0;                                             // Egyedi magasság (0 = UIButton::DEFAULT_BUTTON_HEIGHT)
+    bool useMiniFont = true;                                         // true: mini font, false: nagyobb FreeSans9pt7b
 };
 
 template <typename DerivedContainer> // Curiously Recurring Template Pattern (CRTP): A DerivedContainer lesz a konkrét UIContainerComponent alapú osztály
@@ -92,7 +93,7 @@ class ButtonsGroupManager {
                 // A UIButton-nak van egy textSize tagja, ami alapból 2.
                 // A def.height vagy defaultButtonHeightRef adja a magasságot.
                 uint16_t btnActualHeight = (def.height > 0) ? def.height : defaultButtonHeightRef;
-                btnW = UIButton::calculateWidthForText(def.label, false /*default useMiniFont*/, btnActualHeight);
+                btnW = UIButton::calculateWidthForText(def.label, def.useMiniFont, btnActualHeight);
                 if (btnW <= 0)
                     btnW = defaultButtonWidthRef; // Fallback
             }
@@ -163,7 +164,7 @@ class ButtonsGroupManager {
                     // A bounds-hoz az előfeldolgozásban kalkulált értéket használjuk.
                     // A UIButton konstruktora ezt felülírhatja, ha autoSizeBtn true.
                     uint16_t btnActualHeight = (def.height > 0) ? def.height : defaultButtonHeightRef;
-                    btnWidth = UIButton::calculateWidthForText(def.label, false, btnActualHeight);
+                    btnWidth = UIButton::calculateWidthForText(def.label, def.useMiniFont, btnActualHeight);
                     if (btnWidth <= 0)
                         btnWidth = defaultButtonWidthRef;
                 }
@@ -171,6 +172,7 @@ class ButtonsGroupManager {
 
                 Rect bounds(currentLayoutX, currentLayoutY, btnWidth, btnHeight);
                 auto button = std::make_shared<UIButton>(def.id, bounds, def.label, def.type, def.initialState, def.callback, UIColorPalette::createDefaultButtonScheme(), autoSizeBtn);
+                button->setUseMiniFont(def.useMiniFont);
                 self->addChild(button);
                 if (out_createdButtons) {
                     out_createdButtons->push_back(button);
@@ -239,7 +241,7 @@ class ButtonsGroupManager {
                 btnWidth = def.width;
             } else { // def.width == 0, auto-size
                 uint16_t btnActualHeight = (def.height > 0) ? def.height : defaultButtonHeightRef;
-                btnWidth = UIButton::calculateWidthForText(def.label, false, btnActualHeight);
+                btnWidth = UIButton::calculateWidthForText(def.label, def.useMiniFont, btnActualHeight);
                 if (btnWidth <= 0)
                     btnWidth = defaultButtonWidthRef;
             }
@@ -315,7 +317,7 @@ class ButtonsGroupManager {
                 for (size_t i = 0; i < currentRow.size(); ++i) {
                     const auto &def = currentRow[i];
                     bool autoSizeBtn = (def.width == 0);
-                    int16_t btnActualWidth = autoSizeBtn ? UIButton::calculateWidthForText(def.label, false, (def.height > 0) ? def.height : defaultButtonHeightRef) : def.width;
+                    int16_t btnActualWidth = autoSizeBtn ? UIButton::calculateWidthForText(def.label, def.useMiniFont, (def.height > 0) ? def.height : defaultButtonHeightRef) : def.width;
                     if (btnActualWidth <= 0 && autoSizeBtn)
                         btnActualWidth = defaultButtonWidthRef; // Fallback
                     if (btnActualWidth > maxRowWidth)
@@ -343,7 +345,7 @@ class ButtonsGroupManager {
                     // Az előfeldolgozásban kalkulált szélességet használjuk a Rect-hez.
                     // A gomb maga fogja beállítani a végleges szélességét, ha autoSizeBtn true.
                     uint16_t btnActualHeight = (def.height > 0) ? def.height : defaultButtonHeightRef;
-                    btnWidth = UIButton::calculateWidthForText(def.label, false, btnActualHeight);
+                    btnWidth = UIButton::calculateWidthForText(def.label, def.useMiniFont, btnActualHeight);
                     if (btnWidth <= 0)
                         btnWidth = defaultButtonWidthRef;
                 }
@@ -355,6 +357,7 @@ class ButtonsGroupManager {
 
                 Rect bounds(currentLayoutX, currentLayoutY, btnWidth, btnHeight);
                 auto button = std::make_shared<UIButton>(def.id, bounds, def.label, def.type, def.initialState, def.callback, UIColorPalette::createDefaultButtonScheme(), autoSizeBtn);
+                button->setUseMiniFont(def.useMiniFont);
                 self->addChild(button);
                 if (out_createdButtons) {
                     out_createdButtons->push_back(button);
