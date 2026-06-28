@@ -7,7 +7,7 @@
 extern GpsManager *gpsManager;
 
 // A táblázatban Maximum megjelenítendő elemek száma
-constexpr uint8_t MAX_SATS_TABLE_ITEMS = 9;
+constexpr uint8_t MAX_SATS_TABLE_ITEMS = 12;
 
 // Területek méretei
 static inline int16_t tableX() { return 5; }

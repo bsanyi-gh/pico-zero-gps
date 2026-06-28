@@ -237,7 +237,6 @@ void ScreenInfo::handleOwnLoop() {
     constexpr uint8_t lineHeight = 10;
 
     snprintf(valueBuffer, sizeof(valueBuffer), "%.2fV", sensorUtils.readVBusExternal());
-    // dtostrf(sensorUtils.readVBusExternal(), 0, 2, valueBuffer);
     tft.drawString(valueBuffer, x, y);
     y += lineHeight;
     snprintf(valueBuffer, sizeof(valueBuffer), "%.2fV", sensorUtils.readVSysExternal());
@@ -283,7 +282,7 @@ void ScreenInfo::handleOwnLoop() {
     snprintf(valueBuffer, sizeof(valueBuffer), "%.6f", c1_sharedGpsData.lng);
     tft.drawString(valueBuffer, x, y);
     y += lineHeight;
-    snprintf(valueBuffer, sizeof(valueBuffer), "%.1f m", c1_sharedGpsData.altitudeM);
+    snprintf(valueBuffer, sizeof(valueBuffer), "%.0f m", c1_sharedGpsData.altitudeM);
     tft.drawString(valueBuffer, x, y);
     y += lineHeight;
     tft.drawString(GpsManager::qualityToString(c1_sharedGpsData.fixQuality), x, y);
