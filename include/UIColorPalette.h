@@ -183,25 +183,24 @@ class UIColorPalette {
     }
 
     /**
-     * @brief FreqSegmentColors létrehozása normál (SSB/CW) módhoz
-     * @return Normál mód színkonfigurációja
+     * Sötét színséma gombokhoz
      */
-    static FreqSegmentColors createNormalFreqColors() { return {FREQ_NORMAL_ACTIVE, FREQ_NORMAL_INACTIVE, FREQ_NORMAL_INDICATOR}; }
-
-    /**
-     * @brief FreqSegmentColors létrehozása BFO módhoz
-     * @return BFO mód színkonfigurációja
-     */
-    static FreqSegmentColors createBfoFreqColors() { return {FREQ_BFO_ACTIVE, FREQ_BFO_INACTIVE, FREQ_BFO_INDICATOR}; }
-
-    /**
-     * @brief FreqSegmentColors létrehozása képernyővédő módhoz (kék színséma)
-     * @return Képernyővédő mód színkonfigurációja
-     */
-    static FreqSegmentColors createScreenSaverFreqColors() { return {FREQ_SCREENSAVER_ACTIVE, FREQ_SCREENSAVER_INACTIVE, FREQ_SCREENSAVER_INDICATOR}; }
-
-    // === AUDIO SPEKTRUM SZÍNEK ===
-    static constexpr uint16_t audioSpectrumPrimary = TFT_GREEN;    // Főszín
-    static constexpr uint16_t audioSpectrumSecondary = TFT_YELLOW; // Másodlagos szín
-    static constexpr uint16_t audioSpectrumBackground = TFT_BLACK; // Háttérszín
+    static ButtonColorScheme createDarkButtonScheme() {
+        ButtonColorScheme scheme;
+        scheme.background = TFT_COLOR(40, 40, 60);        // sötétkék-lila háttér
+        scheme.foreground = TFT_COLOR(180, 140, 30);      // sötétebb arany szöveg
+        scheme.border = TFT_BROWN;                        // barna keret
+        scheme.pressedBackground = TFT_COLOR(60, 0, 120); // élénkebb lila lenyomott
+        scheme.pressedForeground = TFT_WHITE;
+        scheme.pressedBorder = TFT_COLOR(255, 220, 80); // aranysárga keret lenyomva
+        scheme.disabledBackground = TFT_COLOR(30, 30, 30);
+        scheme.disabledForeground = TFT_COLOR(120, 120, 120);
+        scheme.disabledBorder = TFT_COLOR(60, 60, 60);
+        scheme.activeBackground = TFT_COLOR(60, 0, 120); // aktív: élénk lila
+        scheme.activeForeground = TFT_COLOR(255, 220, 80);
+        scheme.activeBorder = TFT_COLOR(255, 220, 80);
+        scheme.ledOnColor = TFT_COLOR(0, 255, 180); // türkiz LED
+        scheme.ledOffColor = TFT_COLOR(80, 0, 160);
+        return scheme;
+    }
 };

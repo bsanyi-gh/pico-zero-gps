@@ -2,6 +2,7 @@
 #include "GpsManager.h"
 
 // Főképernyők
+#include "ScreenMain.h"
 #include "ScreenScreenSaver.h"
 
 // Fejlesztői képernyők
@@ -30,6 +31,9 @@ ScreenManager::~ScreenManager() { config.unregisterCallback(configCallbackId); }
  * @brief Alapértelmezett képernyő factory-k regisztrálása
  */
 void ScreenManager::registerDefaultScreenFactories() {
+
+    // Main képernyő regisztrálása
+    registerScreenFactory(SCREEN_NAME_MAIN, []() { return std::make_shared<ScreenMain>(); });
 
     // ScrenSaver képernyő regisztrálása
     registerScreenFactory(SCREEN_NAME_SCREENSAVER, []() { return std::make_shared<ScreenScreenSaver>(); });

@@ -49,13 +49,18 @@ void drawSplashScreen() {
 
     constexpr uint8_t titleSize = 5;
 
+    // A splash saját maga állítja be a használt fontot és méretet,
+    // hogy ne örököljön semmit az előtte futó debug képernyőről.
+    tft.setFreeFont();
+    tft.setTextSize(titleSize);
+
     // Doboz mérete konstansok - könnyű hangolás
     constexpr uint8_t TITLE_BOX_WIDTH_PADDING = 10; // Oldalsó padding - csökkentsd a keskenyebb dobozért
     constexpr uint8_t TITLE_BOX_HEIGHT = 60;        // Doboz magassága - növeld a magasabbért
     constexpr uint8_t TITLE_BOX_Y_OFFSET = 30;      // Y pozíció offset a centerből
 
     // Nagy cím árnyékkal és háttér sávval
-    int titleWidth = tft.textWidth(PROGRAM_NAME, titleSize);
+    int titleWidth = tft.textWidth(PROGRAM_NAME);
     int titleBoxW = titleWidth + TITLE_BOX_WIDTH_PADDING;
     int titleBoxH = TITLE_BOX_HEIGHT;
 
@@ -69,7 +74,6 @@ void drawSplashScreen() {
 
     // Szöveg - fehér + árnyék
     tft.setTextColor(tft.color565(30, 30, 30)); // Sötét árnyék
-    tft.setTextSize(titleSize);
     tft.drawString(PROGRAM_NAME, centerX + 1, titleY + 1);
 
     tft.setTextColor(TFT_WHITE); // Fehér szöveg
@@ -196,7 +200,7 @@ void setup() {
     if (screenManager == nullptr) {
         screenManager = new ScreenManager();
     }
-    screenManager->switchToScreen(SCREEN_NAME_TEST); // A kezdő képernyőre kapcsolás
+    screenManager->switchToScreen(SCREEN_NAME_MAIN); // A kezdő képernyőre kapcsolás
 
     // Pittyentünk egyet, hogy üzemkészek vagyunk
     Utils::beepTick();
