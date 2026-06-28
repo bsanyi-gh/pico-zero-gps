@@ -194,7 +194,7 @@ void setup() {
     tft.setTouch(config.data.tftCalibrateData);
 
     // Még egy picit mutatjuk a splash screent
-    delay(3000);
+    delay(2000);
 
     // ScreenManager inicializálása itt, amikor minden más már kész
     if (screenManager == nullptr) {

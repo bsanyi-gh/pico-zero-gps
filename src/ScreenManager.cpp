@@ -4,6 +4,7 @@
 // Főképernyők
 #include "ScreenInfo.h"
 #include "ScreenMain.h"
+#include "ScreenSats.h"
 #include "ScreenScreenSaver.h"
 
 // Fejlesztői képernyők
@@ -36,6 +37,7 @@ void ScreenManager::registerDefaultScreenFactories() {
     // Main képernyő regisztrálása
     registerScreenFactory(SCREEN_NAME_MAIN, []() { return std::make_shared<ScreenMain>(); });
     registerScreenFactory(SCREEN_NAME_INFO, []() { return std::make_shared<ScreenInfo>(); });
+    registerScreenFactory(SCREEN_NAME_SATS, []() { return std::make_shared<ScreenSats>(); });
 
     // ScrenSaver képernyő regisztrálása
     registerScreenFactory(SCREEN_NAME_SCREENSAVER, []() { return std::make_shared<ScreenScreenSaver>(); });

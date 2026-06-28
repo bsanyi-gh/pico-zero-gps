@@ -33,12 +33,31 @@ ScreenInfo::ScreenInfo() : UIScreen(SCREEN_NAME_INFO) {
  */
 void ScreenInfo::layoutComponents() {
 
-    // Vissza gomb
-    addChild(std::make_shared<UIButton>( //                                                                                                                                  //
-        1,                               //
-        Rect(tft.width() - UIButton::DEFAULT_BUTTON_WIDTH, tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT, UIButton::DEFAULT_BUTTON_WIDTH, UIButton::DEFAULT_BUTTON_HEIGHT), //
-        "Back",                                                                                                                                                              //
-        UIButton::ButtonType::Pushable,                                                                                                                                      //
+    // A Sats gomb jobb a 'Back' gomb előtt
+    addChild(std::make_shared<UIButton>(                           //
+        1,                                                         //
+        Rect(tft.width() - 2 * (UIButton::DEFAULT_BUTTON_WIDTH)-4, // x gap 4 pixel
+             tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT,       // y
+             UIButton::DEFAULT_BUTTON_WIDTH,                       // width
+             UIButton::DEFAULT_BUTTON_HEIGHT),                     // height
+        "Sats",                                                    //
+        UIButton::ButtonType::Pushable,
+        [this](const UIButton::ButtonEvent &event) {
+            if (event.state == UIButton::EventButtonState::Clicked) {
+                getScreenManager()->switchToScreen(SCREEN_NAME_SATS);
+            }
+        }) //
+    );
+
+    // 'Back' gomb a jobb alsó sarokban
+    addChild(std::make_shared<UIButton>(                     //                                                                                                                                  //
+        2,                                                   //
+        Rect(tft.width() - UIButton::DEFAULT_BUTTON_WIDTH,   // x
+             tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT, // y
+             UIButton::DEFAULT_BUTTON_WIDTH,                 // width
+             UIButton::DEFAULT_BUTTON_HEIGHT),               // height
+        "Back",                                              //
+        UIButton::ButtonType::Pushable,                      //
         [this](const UIButton::ButtonEvent &event) {
             if (event.state == UIButton::EventButtonState::Clicked) {
                 getScreenManager()->goBack();

@@ -34,7 +34,7 @@
 #define SCREEN_NAME_MAIN "Main"
 #define SCREEN_NAME_INFO "Info"
 #define SCREEN_NAME_SETUP "Setup"
-// #define SCREEN_NAME_SATS "Satellites"
+#define SCREEN_NAME_SATS "Satellites"
 // #define SCREEN_NAME_TFT_SETUP "ScreenTFTSetup"
 // #define SCREEN_NAME_SYSTEM_SETUP "ScreenSystemSetup"
 // #define SCREEN_NAME_GPS_SETUP "ScreenGPSSetup"
