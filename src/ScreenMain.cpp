@@ -34,6 +34,13 @@ constexpr int16_t SPEED_Y = 52;
 constexpr int16_t SPEED_W = 212;
 constexpr int16_t SPEED_H = 118;
 
+// Függőleges sensor barok pozíció és méret
+constexpr int16_t SENSOR_BAR_X = 0;
+constexpr int16_t SENSOR_BAR_Y = 52;
+constexpr int16_t SENSOR_BAR_W = 52;
+constexpr int16_t SENSOR_BAR_H = 118;
+constexpr int16_t SENSOR_BAR_RIGHT_X = 320 - SENSOR_BAR_W;
+
 // Alsó információs sor
 constexpr int16_t INFO_X = 18;
 constexpr int16_t INFO_Y = 175;
@@ -48,9 +55,16 @@ struct ScreenMainHudState {
     bool initialized = false;
     bool staticPainted = false;
     bool speedSpriteReady = false;
+    bool sensorBarSpriteReady = false;
     float smoothSpeed = 0.0f;
     float lastDrawnSpeed = -1000.0f;
     uint32_t lastRedrawMs = 0;
+
+    float lastVoltageValue = -1000.0f;
+    bool lastVoltageMode = false;
+
+    float lastTemperatureValue = -1000.0f;
+    bool lastTemperatureMode = false;
 
     char lastSatText[24] = "";
     uint16_t lastSatColor = 0;
@@ -66,6 +80,7 @@ struct ScreenMainHudState {
 
 ScreenMainHudState hudState;
 TFT_eSprite speedSprite(&tft);
+TFT_eSprite sensorBarSprite(&tft);
 
 /**
  * @brief Értékeket a megadott tartományba szorítja
@@ -100,6 +115,43 @@ uint16_t arcColorForRatio(float ratio) {
         return TFT_ORANGE;
     }
     return TFT_RED;
+}
+
+/**
+ * @brief Színezés a függőleges meterhez a kitöltési arány alapján
+ * @param ratio A kitöltési arány
+ * @param temperatureBar true, ha hőmérséklet meter, false ha feszültség meter
+ */
+uint16_t meterColorForRatio(float ratio, bool temperatureBar) {
+    if (temperatureBar) {
+        if (ratio < 0.25f) {
+            return TFT_CYAN;
+        }
+        if (ratio < 0.50f) {
+            return TFT_GREEN;
+        }
+        if (ratio < 0.75f) {
+            return TFT_YELLOW;
+        }
+        if (ratio < 0.90f) {
+            return TFT_ORANGE;
+        }
+        return TFT_RED;
+    }
+
+    if (ratio < 0.25f) {
+        return TFT_RED;
+    }
+    if (ratio < 0.50f) {
+        return TFT_ORANGE;
+    }
+    if (ratio < 0.75f) {
+        return TFT_YELLOW;
+    }
+    if (ratio < 0.90f) {
+        return TFT_GREENYELLOW;
+    }
+    return TFT_GREEN;
 }
 
 /**
@@ -148,6 +200,81 @@ void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *v
     tft.setTextSize(1);
     tft.setTextColor(valueColor, panelBg);
     tft.drawString(value, x + 6, y + 20);
+}
+
+/**
+ * @brief Függőleges meter sprite rajzolása
+ * @param value Mért érték
+ * @param minVal Minimum érték
+ * @param maxVal Maximum érték
+ * @param title Címke a meter tetején
+ * @param unit Mértékegység a bottom textben
+ * @param temperatureBar true, ha hőmérséklet meter
+ */
+void drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar) {
+    const uint16_t spriteBg = tft.color565(6, 14, 22);
+    const uint16_t frameColor = tft.color565(0, 132, 214);
+    const uint16_t textColor = tft.color565(170, 220, 255);
+
+    sensorBarSprite.fillSprite(spriteBg);
+    sensorBarSprite.drawRoundRect(0, 0, SENSOR_BAR_W, SENSOR_BAR_H, 4, frameColor);
+
+    sensorBarSprite.setFreeFont();
+    sensorBarSprite.setTextSize(1);
+    sensorBarSprite.setTextDatum(MC_DATUM);
+    sensorBarSprite.setTextColor(textColor, spriteBg);
+    sensorBarSprite.drawString(title, SENSOR_BAR_W / 2, 8);
+
+    constexpr uint8_t BAR_SEGMENTS = 8;
+    constexpr int16_t BAR_W = 18;
+    constexpr int16_t BAR_H = 8;
+    constexpr int16_t BAR_GAP = 1;
+    const int16_t barX = (SENSOR_BAR_W - BAR_W) / 2;
+    const int16_t topSpace = 18;
+    const int16_t valueSpace = 16;
+    const int16_t barTotalH = BAR_SEGMENTS * BAR_H + (BAR_SEGMENTS - 1) * BAR_GAP;
+    const int16_t barStartY = topSpace + (SENSOR_BAR_H - topSpace - valueSpace - barTotalH) / 2;
+
+    float normalized = 0.0f;
+    if (maxVal > minVal) {
+        normalized = clampf((value - minVal) / (maxVal - minVal), 0.0f, 1.0f);
+    }
+    int filledSegments = static_cast<int>(std::lroundf(normalized * BAR_SEGMENTS));
+    if (filledSegments < 0) {
+        filledSegments = 0;
+    }
+    if (filledSegments > BAR_SEGMENTS) {
+        filledSegments = BAR_SEGMENTS;
+    }
+
+    for (int segment = 0; segment < BAR_SEGMENTS; segment++) {
+        const int16_t y = barStartY + (BAR_SEGMENTS - 1 - segment) * (BAR_H + BAR_GAP);
+        uint16_t color = TFT_DARKGREY;
+        if (segment < filledSegments) {
+            const float segmentRatio = static_cast<float>(segment + 1) / BAR_SEGMENTS;
+            color = meterColorForRatio(segmentRatio, temperatureBar);
+        }
+        sensorBarSprite.fillRoundRect(barX, y, BAR_W, BAR_H, 2, color);
+    }
+
+    char valueText[20];
+    snprintf(valueText, sizeof(valueText), "%.1f%s", value, unit);
+    sensorBarSprite.setTextColor(temperatureBar ? TFT_ORANGE : TFT_GREENYELLOW, spriteBg);
+    sensorBarSprite.drawString(valueText, SENSOR_BAR_W / 2, SENSOR_BAR_H - 10);
+
+    sensorBarSprite.pushSprite(temperatureBar ? SENSOR_BAR_RIGHT_X : SENSOR_BAR_X, SENSOR_BAR_Y);
+}
+
+/**
+ * @brief Sensor bar sprite előkészítése, ha még nincs létrehozva
+ */
+void ensureSensorBarSpriteReady() {
+    if (hudState.sensorBarSpriteReady) {
+        return;
+    }
+
+    sensorBarSprite.setColorDepth(8);
+    hudState.sensorBarSpriteReady = sensorBarSprite.createSprite(SENSOR_BAR_W, SENSOR_BAR_H) != nullptr;
 }
 
 /**
@@ -380,6 +507,8 @@ void ScreenMain::onConfigChanged() {
     //}
     //_isExternalVoltageMode = config.data.externalVoltageMode;
     //_isExternalTemperatureMode = config.data.externalTemperatureMode;
+
+    forceRedraw = true;
 }
 
 /**
@@ -393,6 +522,10 @@ void ScreenMain::activate() {
     hudState.staticPainted = false;
     hudState.lastDrawnSpeed = -1000.0f;
     hudState.lastRedrawMs = 0;
+    hudState.lastVoltageValue = -1000.0f;
+    hudState.lastVoltageMode = !config.data.externalVoltageMode;
+    hudState.lastTemperatureValue = -1000.0f;
+    hudState.lastTemperatureMode = !config.data.externalTemperatureMode;
     std::strcpy(hudState.lastSatText, "");
     std::strcpy(hudState.lastTimeText, "");
     std::strcpy(hudState.lastHdopText, "");
@@ -442,8 +575,12 @@ void ScreenMain::handleOwnLoop() {
     const bool speedValid = c1_sharedGpsData.speedValid;
     const bool timeValid = c1_sharedGpsData.timeValid;
     const bool locationValid = c1_sharedGpsData.locationValid;
+    const bool voltageMode = config.data.externalVoltageMode;
+    const bool temperatureMode = config.data.externalTemperatureMode;
 
     const float speedKmph = clampf(hudState.smoothSpeed, 0.0f, HUD_MAX_SPEED_KMPH);
+    const float voltageValue = voltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
+    const float temperatureValue = temperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
     const uint8_t satelliteCount = c1_sharedGpsData.satelliteCountForUI;
     const float hdop = c1_sharedGpsData.hdop;
     const uint8_t hour = c1_sharedGpsData.hour;
@@ -454,6 +591,9 @@ void ScreenMain::handleOwnLoop() {
     const uint8_t fixMode = c1_sharedGpsData.fixMode;
     const float courseDeg = c1_sharedGpsData.courseDeg;
     const uint32_t bootSec = c1_sharedGpsData.gpsBootTime;
+    const bool voltageNeedsUpdate = forceRedraw || voltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
+    const bool temperatureNeedsUpdate = forceRedraw || temperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
+    const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
 
     // Műholdak száma
     char satText[24];
@@ -495,6 +635,22 @@ void ScreenMain::handleOwnLoop() {
     // Sebesség widget kirajzolása
     drawSpeedWidget(speedKmph, speedValid);
 
+    if (anyBarNeedsUpdate) {
+        ensureSensorBarSpriteReady();
+        if (hudState.sensorBarSpriteReady) {
+            drawSensorBarSprite(voltageValue, voltageMode ? 3.5f : 2.7f, voltageMode ? 15.5f : 5.5f, voltageMode ? "Vbus" : "Vsys", "V", false);
+            drawSensorBarSprite(temperatureValue, -20.0f, 70.0f, temperatureMode ? "EXT" : "CPU", "C", true);
+        } else {
+            tft.fillRect(SENSOR_BAR_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
+            tft.fillRect(SENSOR_BAR_RIGHT_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
+        }
+
+        hudState.lastVoltageValue = voltageValue;
+        hudState.lastVoltageMode = voltageMode;
+        hudState.lastTemperatureValue = temperatureValue;
+        hudState.lastTemperatureMode = temperatureMode;
+    }
+
     // Alsó információs sor szövege
     char bottomText[128];
     if (altitudeValid) {
@@ -528,6 +684,30 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
     // Csak lenyomás eseményre reagálunk
     if (!event.pressed) {
         return UIScreen::handleTouch(event); // Továbbítjuk az ősosztálynak
+    }
+
+    // Bal oldali függőleges bar: feszültségmérés mód váltás
+    if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+        config.data.externalVoltageMode = !config.data.externalVoltageMode;
+        config.checkSave();
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
+    // Jobb oldali függőleges bar: hőmérsékletmérés mód váltás
+    if (event.x >= SENSOR_BAR_RIGHT_X && event.x < SENSOR_BAR_RIGHT_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+        config.data.externalTemperatureMode = !config.data.externalTemperatureMode;
+        config.checkSave();
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
     }
 
     // Ha nem volt találat, továbbítjuk az alaposztálynak
