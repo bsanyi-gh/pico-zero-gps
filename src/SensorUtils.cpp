@@ -146,8 +146,14 @@ float SensorUtils::readCoreTemperature() {
  * @brief visszaadja a külső hőmérsékletet
  */
 float SensorUtils::readExternalTemperature() {
-    // Itt nem kell cache-t használni, mert csak a változáskor frissül az externalTemperatureValue értéke
-    return externalTemperatureValue;
+    // A library saját cache-ét kérdezzük le közvetlenül, hogy ne csak a change callbacktől függjön az érték.
+    const float temperature = nonBlockingDallasTemp.getTemperatureC(static_cast<uint8_t>(DS18B20_TEMP_SENSOR_NDX));
+    if (temperature < -100.0f || temperature > 150.0f) {
+        return externalTemperatureValue;
+    }
+
+    externalTemperatureValue = temperature;
+    return temperature;
 }
 
 /**

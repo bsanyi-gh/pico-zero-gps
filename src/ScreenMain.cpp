@@ -4,83 +4,198 @@
 
 #include "ScreenMain.h"
 #include "defines.h"
+#include "pins.h"
 
-namespace {
+extern TraffipaxManager traffipaxManager;
 
-constexpr float HUD_MAX_SPEED_KMPH = 180.0f;
-constexpr uint32_t HUD_UPDATE_INTERVAL_MS = 120;
+void ScreenMain::stopTraffipaxSiren() {
+    noTone(PIN_BUZZER);
+    traffipaxSiren.active = false;
+    traffipaxSiren.step = 0;
+    traffipaxSiren.nextStepTime = 0;
+}
 
-// Sebesség widget pozíció és méret
-constexpr int16_t TRACK_X = 8;
-constexpr int16_t TRACK_Y = 6;
-constexpr int16_t TRACK_W = 98;
-constexpr int16_t TRACK_H = 40;
+void ScreenMain::startTraffipaxSiren(unsigned long currentTime) {
+    if (!config.data.beeperEnabled) {
+        return;
+    }
 
-// Idő widget pozíció és méret
-constexpr int16_t TIME_X = 111;
-constexpr int16_t TIME_Y = 6;
-constexpr int16_t TIME_W = 98;
-constexpr int16_t TIME_H = 40;
+    traffipaxSiren.active = true;
+    traffipaxSiren.step = 0;
+    traffipaxSiren.nextStepTime = currentTime + 50;
+    traffipaxSiren.nextRepeatTime = currentTime + TRAFFI_ALERT_SIREN_INTERVAL_MS;
+    tone(PIN_BUZZER, 600);
+}
 
-// PREC widget pozíció és méret
-constexpr int16_t PREC_X = 214;
-constexpr int16_t PREC_Y = 6;
-constexpr int16_t PREC_W = 98;
-constexpr int16_t PREC_H = 40;
+void ScreenMain::updateTraffipaxSiren(unsigned long currentTime) {
+    if (!traffipaxSiren.active) {
+        return;
+    }
 
-// Sebesség widget pozíció és méret
-constexpr int16_t SPEED_X = 54;
-constexpr int16_t SPEED_Y = 52;
-constexpr int16_t SPEED_W = 212;
-constexpr int16_t SPEED_H = 118;
+    if (currentTime < traffipaxSiren.nextStepTime) {
+        return;
+    }
 
-// Függőleges sensor barok pozíció és méret
-constexpr int16_t SENSOR_BAR_X = 0;
-constexpr int16_t SENSOR_BAR_Y = 52;
-constexpr int16_t SENSOR_BAR_W = 52;
-constexpr int16_t SENSOR_BAR_H = 118;
-constexpr int16_t SENSOR_BAR_RIGHT_X = 320 - SENSOR_BAR_W;
+    if (traffipaxSiren.step == 0) {
+        noTone(PIN_BUZZER);
+        tone(PIN_BUZZER, 1800);
+        traffipaxSiren.step = 1;
+        traffipaxSiren.nextStepTime = currentTime + 50;
+    } else {
+        stopTraffipaxSiren();
+    }
+}
 
-// Alsó információs sor
-constexpr int16_t INFO_X = 18;
-constexpr int16_t INFO_Y = 175;
-constexpr int16_t INFO_W = 284;
-constexpr int16_t INFO_H = 26;
+void ScreenMain::drawTraffipaxBaseArea() {
+    for (int16_t y = 0; y < TRAFFI_ALERT_H; y++) {
+        const uint16_t bg = tft.color565(0, 40 + (y * 60) / tft.height(), 80 + (y * 100) / tft.height());
+        tft.drawFastHLine(0, y, tft.width(), bg);
+    }
 
-/**
- * @brief A HUD állapotát tároló struktúra
- *
- */
-struct ScreenMainHudState {
-    bool initialized = false;
-    bool staticPainted = false;
-    bool speedSpriteReady = false;
-    bool sensorBarSpriteReady = false;
-    float smoothSpeed = 0.0f;
-    float lastDrawnSpeed = -1000.0f;
-    uint32_t lastRedrawMs = 0;
+    // A top HUD elemei, amelyek az alert sáv alatt is látszanak, ha nincs riasztás
+    drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "TRACK", "--", TFT_DARKGREY);
+    drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "LOCAL", "--:--", TFT_DARKGREY);
+    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "PREC", "HDOP --", TFT_DARKGREY);
+}
 
-    float lastVoltageValue = -1000.0f;
-    bool lastVoltageMode = false;
+void ScreenMain::clearTraffipaxAlert() {
+    drawTraffipaxBaseArea();
+    stopTraffipaxSiren();
+}
 
-    float lastTemperatureValue = -1000.0f;
-    bool lastTemperatureMode = false;
+void ScreenMain::displayTraffipaxAlert(const TraffipaxManager::TraffipaxRecord *traffipax, double distance, ScreenMain::TraffipaxAlertState::State state) {
+    if (traffipax == nullptr) {
+        return;
+    }
 
-    char lastSatText[24] = "";
-    uint16_t lastSatColor = 0;
+    uint16_t backgroundColor = TFT_RED;
+    uint16_t textColor = TFT_WHITE;
+    if (state == TraffipaxAlertState::DEPARTING) {
+        backgroundColor = TFT_ORANGE;
+        textColor = TFT_BLACK;
+    }
 
-    char lastTimeText[24] = "";
-    uint16_t lastTimeColor = 0;
+    tft.fillRect(0, TRAFFI_ALERT_Y, tft.width(), TRAFFI_ALERT_H, backgroundColor);
+    tft.setFreeFont();
+    tft.setTextColor(textColor, backgroundColor);
 
-    char lastHdopText[24] = "";
-    uint16_t lastHdopColor = 0;
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextSize(2);
+    tft.drawString(traffipax->city, 8, 8);
 
-    char lastBottomText[128] = "";
-};
+    tft.setTextSize(1);
+    tft.drawString(traffipax->street_or_km, 8, 28);
 
-ScreenMainHudState hudState;
-TFT_eSprite speedSprite(&tft);
-TFT_eSprite sensorBarSprite(&tft);
+    char distanceText[16];
+    snprintf(distanceText, sizeof(distanceText), "%dm", static_cast<int>(std::lround(distance)));
+    tft.setTextDatum(MR_DATUM);
+    tft.setFreeFont(&FreeSerifBold24pt7b);
+    tft.setTextSize(1);
+    tft.setTextPadding(tft.textWidth("8888m"));
+    tft.drawString(distanceText, tft.width() - 8, TRAFFI_ALERT_H / 2);
+    tft.setFreeFont();
+}
+
+void ScreenMain::processTraffipaxAlert(double currentLat, double currentLon, bool positionValid, bool &forceRedrawFlag) {
+
+    if (!positionValid || !config.data.gpsTraffiAlarmEnabled) {
+        stopTraffipaxSiren();
+        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
+            traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
+            traffipaxAlert.activeTraffipax = nullptr;
+            traffipaxAlert.currentDistance = 0.0;
+            clearTraffipaxAlert();
+            hudState.staticPainted = false;
+            hudState.lastRedrawMs = 0;
+            forceRedrawFlag = true;
+        }
+        traffiOutOfRangeStart = 0;
+        return;
+    }
+
+    double minDistance = 999999.0;
+    const TraffipaxManager::TraffipaxRecord *closestTraffipax = traffipaxManager.getClosestTraffipax(currentLat, currentLon, minDistance);
+    const unsigned long currentTime = millis();
+
+    if (closestTraffipax == nullptr) {
+        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
+            traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
+            traffipaxAlert.activeTraffipax = nullptr;
+            clearTraffipaxAlert();
+            hudState.staticPainted = false;
+            hudState.lastRedrawMs = 0;
+            forceRedrawFlag = true;
+        }
+        traffiOutOfRangeStart = 0;
+        return;
+    }
+
+    if (minDistance > config.data.gpsTraffiAlarmDistance) {
+        if (traffiOutOfRangeStart == 0) {
+            traffiOutOfRangeStart = currentTime;
+        }
+
+        if (currentTime - traffiOutOfRangeStart > TRAFFI_ALERT_OUT_OF_RANGE_CLEAR_MS) {
+            if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
+                traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
+                traffipaxAlert.activeTraffipax = nullptr;
+                clearTraffipaxAlert();
+                hudState.staticPainted = false;
+                hudState.lastRedrawMs = 0;
+                forceRedrawFlag = true;
+            }
+            traffiOutOfRangeStart = 0;
+            return;
+        }
+
+        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE && traffipaxAlert.activeTraffipax) {
+            traffipaxAlert.currentDistance = minDistance;
+            displayTraffipaxAlert(traffipaxAlert.activeTraffipax, minDistance, traffipaxAlert.currentState);
+        }
+        return;
+    }
+
+    traffiOutOfRangeStart = 0;
+
+    const bool isApproaching = minDistance < (traffipaxAlert.lastDistance - TRAFFI_ALERT_DISTANCE_EPSILON_M);
+    const bool isDeparting = minDistance > (traffipaxAlert.lastDistance + TRAFFI_ALERT_DISTANCE_EPSILON_M);
+    const bool isStoppedNear = !isApproaching && !isDeparting && minDistance <= config.data.gpsTraffiAlarmDistance;
+
+    TraffipaxAlertState::State newState = traffipaxAlert.currentState;
+    if (traffipaxAlert.currentState == TraffipaxAlertState::INACTIVE) {
+        newState = TraffipaxAlertState::APPROACHING;
+    } else if (isApproaching) {
+        newState = TraffipaxAlertState::APPROACHING;
+    } else if (isDeparting) {
+        newState = TraffipaxAlertState::DEPARTING;
+    } else if (isStoppedNear) {
+        newState = TraffipaxAlertState::NEARBY_STOPPED;
+    }
+
+    if (newState != traffipaxAlert.currentState) {
+        traffipaxAlert.currentState = newState;
+        traffipaxAlert.activeTraffipax = closestTraffipax;
+        forceRedrawFlag = true;
+        hudState.staticPainted = false;
+        if (newState != TraffipaxAlertState::APPROACHING) {
+            stopTraffipaxSiren();
+        }
+    }
+
+    traffipaxAlert.currentDistance = minDistance;
+    displayTraffipaxAlert(closestTraffipax, minDistance, traffipaxAlert.currentState);
+
+    if (config.data.gpsTraffiSirenAlarmEnabled && traffipaxAlert.currentState == TraffipaxAlertState::APPROACHING) {
+        if (currentTime - traffipaxAlert.lastSirenTime >= TRAFFI_ALERT_SIREN_INTERVAL_MS) {
+            startTraffipaxSiren(currentTime);
+            traffipaxAlert.lastSirenTime = currentTime;
+        }
+    }
+
+    updateTraffipaxSiren(currentTime);
+
+    traffipaxAlert.lastDistance = minDistance;
+}
 
 /**
  * @brief Értékeket a megadott tartományba szorítja
@@ -89,7 +204,7 @@ TFT_eSprite sensorBarSprite(&tft);
  * @param hi A maximum érték
  * @return A szorított érték
  */
-float clampf(float v, float lo, float hi) {
+float ScreenMain::clampf(float v, float lo, float hi) {
     if (v < lo) {
         return lo;
     }
@@ -104,7 +219,7 @@ float clampf(float v, float lo, float hi) {
  * @param ratio A kitöltési arány (0.0 - 1.0)
  * @return A kitöltési arányhoz tartozó szín
  */
-uint16_t arcColorForRatio(float ratio) {
+uint16_t ScreenMain::arcColorForRatio(float ratio) {
     if (ratio < 0.55f) {
         return TFT_CYAN;
     }
@@ -122,7 +237,7 @@ uint16_t arcColorForRatio(float ratio) {
  * @param ratio A kitöltési arány
  * @param temperatureBar true, ha hőmérséklet meter, false ha feszültség meter
  */
-uint16_t meterColorForRatio(float ratio, bool temperatureBar) {
+uint16_t ScreenMain::meterColorForRatio(float ratio, bool temperatureBar) {
     if (temperatureBar) {
         if (ratio < 0.25f) {
             return TFT_CYAN;
@@ -165,7 +280,7 @@ uint16_t meterColorForRatio(float ratio, bool temperatureBar) {
  * @param valueColor Az érték szövegének színe
  *
  */
-void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor) {
+void ScreenMain::drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor) {
     const uint16_t panelBg = tft.color565(8, 16, 26);
     const uint16_t panelBorder = tft.color565(0, 160, 255);
 
@@ -192,7 +307,7 @@ void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title,
  * @param valueColor Az érték szövegének színe
  *
  */
-void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor) {
+void ScreenMain::drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor) {
     const uint16_t panelBg = tft.color565(8, 16, 26);
     tft.fillRect(x + 2, y + 17, w - 4, h - 19, panelBg);
     tft.setFreeFont();
@@ -211,7 +326,7 @@ void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *v
  * @param unit Mértékegység a bottom textben
  * @param temperatureBar true, ha hőmérséklet meter
  */
-void drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar) {
+void ScreenMain::drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar) {
     const uint16_t spriteBg = tft.color565(6, 14, 22);
     const uint16_t frameColor = tft.color565(0, 132, 214);
     const uint16_t textColor = tft.color565(170, 220, 255);
@@ -268,7 +383,7 @@ void drawSensorBarSprite(float value, float minVal, float maxVal, const char *ti
 /**
  * @brief Sensor bar sprite előkészítése, ha még nincs létrehozva
  */
-void ensureSensorBarSpriteReady() {
+void ScreenMain::ensureSensorBarSpriteReady() {
     if (hudState.sensorBarSpriteReady) {
         return;
     }
@@ -287,7 +402,7 @@ void ensureSensorBarSpriteReady() {
  * @param rInner Belső ív sugara
  *
  */
-template <typename Canvas> void drawSpeedArc(Canvas &canvas, float speedKmph, int16_t centerX, int16_t centerY, int16_t rOuter, int16_t rInner) {
+template <typename Canvas> void ScreenMain::drawSpeedArc(Canvas &canvas, float speedKmph, int16_t centerX, int16_t centerY, int16_t rOuter, int16_t rInner) {
     const float clampedSpeed = clampf(speedKmph, 0.0f, HUD_MAX_SPEED_KMPH);
     const float fillRatio = clampedSpeed / HUD_MAX_SPEED_KMPH;
 
@@ -322,7 +437,7 @@ template <typename Canvas> void drawSpeedArc(Canvas &canvas, float speedKmph, in
  * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik, vagy amikor a képernyő teljes újrarajzolása szükséges.
  *
  */
-void drawStaticHudBackground() {
+void ScreenMain::drawStaticHudBackground() {
     for (int16_t y = 0; y < tft.height(); y++) {
         const uint16_t bg = tft.color565(0, 10 + (y * 22) / tft.height(), 18 + (y * 34) / tft.height());
         tft.drawFastHLine(0, y, tft.width(), bg);
@@ -343,7 +458,7 @@ void drawStaticHudBackground() {
 /**
  * @brief Sebesség widgethez szükséges sprite inicializálása, ha még nem történt meg
  */
-void ensureSpeedSpriteReady() {
+void ScreenMain::ensureSpeedSpriteReady() {
     if (hudState.speedSpriteReady) {
         return;
     }
@@ -357,7 +472,7 @@ void ensureSpeedSpriteReady() {
  * @param speedKmph Sebesség km/h-ban
  * @param speedValid Sebesség érvényessége
  */
-void drawSpeedWidget(float speedKmph, bool speedValid) {
+void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid) {
 
     // A Sprite létrehozása, ha még nem történt meg
     ensureSpeedSpriteReady();
@@ -427,12 +542,10 @@ void drawSpeedWidget(float speedKmph, bool speedValid) {
     tft.drawString("km/h", 160, 150);
 }
 
-} // namespace
-
 /**
  * @brief ScreenMain konstruktor
  */
-ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN) {
+ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft) {
 
     DEBUG("ScreenMain: Constructor called\n");
 
@@ -672,6 +785,9 @@ void ScreenMain::handleOwnLoop() {
         std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
         hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
     }
+
+    // Traffipax közeledés / távolodás figyelmeztetés
+    processTraffipaxAlert(c1_sharedGpsData.lat, c1_sharedGpsData.lng, c1_sharedGpsData.locationValid, forceRedraw);
 }
 
 /**
