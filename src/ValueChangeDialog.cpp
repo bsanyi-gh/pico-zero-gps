@@ -318,10 +318,7 @@ void ValueChangeDialog::drawSelf() {
         tft.setTextSize(1);
         tft.setTextColor(colors.foreground, colors.background); // A dialógus általános színeit használjuk
         tft.setTextDatum(TC_DATUM);                             // Top-Center igazítás
-        // Szélesség korlátozása a szövegnek, hogy ne lógjon ki
-        // uint16_t messageMaxWidth = contentBounds.width - (2 * (PADDING + 5)); // 5px extra margó mindkét oldalon
-        // TODO: Szükség esetén szövegtördelés implementálása, ha a szöveg túl hosszú
-        tft.drawString(this->message, centerX, messageY); // A font már be van állítva a setFreeFont hívással
+        tft.drawString(this->message, centerX, messageY);       // A font már be van állítva a setFreeFont hívással
     }
 
     // Aktuális érték megjelenítése - gombok szintjében

@@ -21,7 +21,7 @@
 #endif
 
 // Debug módban várakozás a soros port megnyitására
-#define DEBUG_WAIT_FOR_SERIAL
+// #define DEBUG_WAIT_FOR_SERIAL
 
 //---- Program Information ------------------------------------------
 
