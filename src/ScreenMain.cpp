@@ -291,8 +291,8 @@ template <typename Canvas> void drawSpeedArc(Canvas &canvas, float speedKmph, in
     const float clampedSpeed = clampf(speedKmph, 0.0f, HUD_MAX_SPEED_KMPH);
     const float fillRatio = clampedSpeed / HUD_MAX_SPEED_KMPH;
 
-    constexpr float startDeg = 145.0f;
-    constexpr float endDeg = 395.0f;
+    constexpr float startDeg = 205.0f;
+    constexpr float endDeg = 335.0f;
     constexpr int segments = 52;
 
     for (int i = 0; i < segments; i++) {
@@ -381,7 +381,7 @@ void drawSpeedWidget(float speedKmph, bool speedValid) {
         }
 
         // Sebesség ív kirajzolása
-        drawSpeedArc(speedSprite, speedKmph, 106, 72, 58, 42);
+        drawSpeedArc(speedSprite, speedKmph, 106, 86, 84, 70);
 
         // Sebesség szöveg kirajzolása
         speedSprite.setTextDatum(MC_DATUM);
@@ -389,17 +389,17 @@ void drawSpeedWidget(float speedKmph, bool speedValid) {
         speedSprite.setTextSize(1);
 
         char speedText[8];
-        snprintf(speedText, sizeof(speedText), "%03d", static_cast<int>(std::lroundf(speedKmph)));
+        snprintf(speedText, sizeof(speedText), "%d", static_cast<int>(std::lroundf(speedKmph)));
         const uint16_t speedColor = speedValid ? TFT_WHITE : TFT_DARKGREY;
 
         speedSprite.setTextColor(speedColor, TFT_BLACK);
-        speedSprite.drawString(speedText, 106, 60);
+        speedSprite.drawString(speedText, 106, 64);
 
         // "KM/H" felirat kirajzolása
         speedSprite.setFreeFont();
         speedSprite.setTextSize(2);
         speedSprite.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
-        speedSprite.drawString("km/h", 106, 92);
+        speedSprite.drawString("km/h", 106, 100);
 
         speedSprite.pushSprite(SPEED_X, SPEED_Y);
         return;
@@ -407,7 +407,7 @@ void drawSpeedWidget(float speedKmph, bool speedValid) {
 
     // Ha a sprite nem jött létre, akkor a sebesség widgetet közvetlenül a képernyőre rajzoljuk
     tft.fillRect(SPEED_X, SPEED_Y, SPEED_W, SPEED_H, TFT_BLACK);
-    drawSpeedArc(tft, speedKmph, 160, 124, 58, 42);
+    drawSpeedArc(tft, speedKmph, 160, 138, 84, 70);
 
     // Sebesség szöveg kirajzolása
     tft.setTextDatum(MC_DATUM);
@@ -416,15 +416,15 @@ void drawSpeedWidget(float speedKmph, bool speedValid) {
     tft.setTextSize(1);
 
     char speedText[8];
-    snprintf(speedText, sizeof(speedText), "%03d", static_cast<int>(std::lroundf(speedKmph)));
+    snprintf(speedText, sizeof(speedText), "%d", static_cast<int>(std::lroundf(speedKmph)));
     tft.setTextColor(speedValid ? TFT_WHITE : TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(speedText, 160, 112);
+    tft.drawString(speedText, 160, 118);
 
     // "KM/H" felirat kirajzolása
     tft.setFreeFont();
     tft.setTextSize(2);
     tft.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
-    tft.drawString("km/h", 160, 144);
+    tft.drawString("km/h", 160, 150);
 }
 
 } // namespace
