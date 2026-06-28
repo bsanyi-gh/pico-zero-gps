@@ -96,38 +96,39 @@ class GpsManager {
 // Megosztott GPS adatok - Core 1 ír, Core 0 olvas (volatile)
 struct GpsData {
     // Pozíció
-    volatile bool locationValid;
-    volatile double lat;
-    volatile double lng;
+    volatile bool locationValid; // TinyGPSLocation::isValid() && TinyGPSLocation::age() < GPS_DATA_MAX_AGE
+    volatile double lat;         // WGS84 fokokban
+    volatile double lng;         // WGS84 fokokban
     volatile uint8_t fixQuality; // TinyGPSLocation::FixQuality_t
     volatile uint8_t fixMode;    // TinyGPSLocation::FixMode_t
 
-    // Mozgás
-    volatile bool speedValid;
-    volatile float speedKmph;
-    volatile float courseDeg;
+    // Sebesség
+    volatile bool speedValid; // TinyGPSSpeed::isValid()
+    volatile float speedKmph; // km/h
+    volatile float courseDeg; // irány (fok)
 
     // Magasság
-    volatile float altitudeM;
-    volatile bool altitudeValid;
+    volatile bool altitudeValid; // TinyGPSAltitude::isValid()
+    volatile float altitudeM;    // m
 
     // Műholdak és jel
-    volatile uint8_t satelliteCount;
+    volatile uint8_t satelliteCount;      // TinyGPSSatellites::value()
     volatile uint8_t satelliteCountForUI; // UI számára, hogy ne ugráljon a szám
     volatile float hdop;
 
     // Helyi dátum és idő (CET/CEST korrigált)
-    volatile uint8_t hour;
-    volatile uint8_t minute;
-    volatile uint8_t second;
-    volatile bool timeValid;
-    volatile uint8_t day;
-    volatile uint8_t month;
-    volatile uint16_t year;
-    volatile bool dateValid;
+    volatile bool timeValid; // TinyGPSTime::isValid() && TinyGPSDate::isValid()
+    volatile uint8_t hour;   // 0-23
+    volatile uint8_t minute; // 0-59
+    volatile uint8_t second; // 0-59
+
+    volatile bool dateValid; // TinyGPSDate::isValid()
+    volatile uint16_t year;  // 4-digit year
+    volatile uint8_t month;  // 1-12
+    volatile uint8_t day;    // 1-31
 
     // Az első valid fix-ig eltelt indulási idő (másodperc)
-    volatile uint32_t gpsBootTime;
+    volatile uint32_t gpsBootTime; // A GPS mikor látott érvényes műholdat (másodperc)
 };
 
 // main-c1-ben definiálva van a változó, hogy Core1 írja, Core0 olvassa
