@@ -86,8 +86,17 @@ void removeAccents(char *text);
  * @param decimalPlaces A tizedesjegyek száma
  * @param buffer A kimeneti buffer (min. 16 karakter ajánlott)
  * @param bufferSize A buffer mérete
- * @return A buffer pointere a kényelmesebb használatért
+ * @return A buffer pointer a kényelmesebb használatért
  */
 char *floatToString(float value, int decimalPlaces, char *buffer, size_t bufferSize);
+
+/**
+ * @brief Átalakít egy másodperc értéket "perc:mp" formátumú szöveggé
+ * @param sec Időérték másodpercben
+ * @param buffer A kimeneti buffer (min. 8 karakter)
+ * @param bufferSize A buffer mérete
+ * @return A buffer pointere a kényelmesebb használatért
+ */
+char *secToMinSecString(uint32_t sec, char *buffer, size_t bufferSize);
 
 } // namespace Utils

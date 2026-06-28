@@ -100,6 +100,7 @@ void GpsManager::updateSharedData() {
     c1_sharedGpsData.altitudeValid = gps.altitude.isValid();
 
     c1_sharedGpsData.satelliteCount = gps.satellites.isValid() ? (uint8_t)gps.satellites.value() : 0;
+    c1_sharedGpsData.satelliteCountForUI = satelliteDb.countSatsForUI(); // Műholdak száma az adatbázisban, UI számára
     c1_sharedGpsData.hdop = gps.hdop.isValid() ? (float)gps.hdop.hdop() : 99.9f;
 
     c1_sharedGpsData.timeValid = false;

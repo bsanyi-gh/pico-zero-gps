@@ -113,6 +113,7 @@ struct GpsData {
 
     // Műholdak és jel
     volatile uint8_t satelliteCount;
+    volatile uint8_t satelliteCountForUI; // UI számára, hogy ne ugráljon a szám
     volatile float hdop;
 
     // Helyi dátum és idő (CET/CEST korrigált)

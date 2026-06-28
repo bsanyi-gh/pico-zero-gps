@@ -220,4 +220,18 @@ char *floatToString(float value, int decimalPlaces, char *buffer, size_t bufferS
     return buffer;
 }
 
+/**
+ * @brief Átalakít egy másodperc értéket "perc:mp" formátumú szöveggé
+ * @param sec Időérték másodpercben
+ * @param buffer A kimeneti buffer (min. 8 karakter)
+ * @param bufferSize A buffer mérete
+ * @return A buffer pointere a kényelmesebb használatért
+ */
+char *secToMinSecString(uint32_t sec, char *buffer, size_t bufferSize) {
+    uint32_t minutes = sec / 60;
+    uint32_t seconds = sec % 60;
+    snprintf(buffer, bufferSize, "%02u:%02u", minutes, seconds);
+    return buffer;
+}
+
 } // namespace Utils
