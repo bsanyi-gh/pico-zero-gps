@@ -4,49 +4,331 @@
 
 #include "ScreenMain.h"
 #include "defines.h"
-#include "pins.h"
 
 extern TraffipaxManager traffipaxManager;
 
-void ScreenMain::stopTraffipaxSiren() {
-    noTone(PIN_BUZZER);
-    traffipaxSiren.active = false;
-    traffipaxSiren.step = 0;
-    traffipaxSiren.nextStepTime = 0;
+/**
+ * @brief ScreenMain konstruktor
+ */
+ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft) {
+
+    DEBUG("ScreenMain: Constructor called\n");
+
+    // Feliratkozás a config változásokra
+    configCallbackId = config.registerChangeCallback([this]() { this->onConfigChanged(); });
+
+    // UI komponensek elhelyezése
+    layoutComponents();
+
+    // Kezdeti érték beállítása
+    onConfigChanged();
 }
 
-void ScreenMain::startTraffipaxSiren(unsigned long currentTime) {
-    if (!config.data.beeperEnabled) {
-        return;
-    }
+/**
+ * @brief ScreenMain destruktor
+ */
+ScreenMain::~ScreenMain() { config.unregisterCallback(configCallbackId); }
 
-    traffipaxSiren.active = true;
-    traffipaxSiren.step = 0;
-    traffipaxSiren.nextStepTime = currentTime + 50;
-    traffipaxSiren.nextRepeatTime = currentTime + TRAFFI_ALERT_SIREN_INTERVAL_MS;
-    tone(PIN_BUZZER, 600);
+/**
+ * UI komponensek elhelyezése
+ */
+void ScreenMain::layoutComponents() {
+    constexpr uint16_t MARGIN = 1;
+
+    // Info gomb bal alsó sarokban
+
+    addChild(std::make_shared<UIButton>(
+        1,                                                            // Info gomb azonosítója
+        Rect(MARGIN,                                                  // x
+             tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT - MARGIN, // y
+             UIButton::DEFAULT_BUTTON_WIDTH,                          // szélesség
+             UIButton::DEFAULT_BUTTON_HEIGHT),                        // magasság
+        "Info",                                                       //
+        UIButton::ButtonType::Pushable,
+        [this](const UIButton::ButtonEvent &event) {
+            if (event.state == UIButton::EventButtonState::Clicked) {
+                getScreenManager()->switchToScreen(SCREEN_NAME_INFO);
+            }
+        },
+        UIColorPalette::createDarkButtonScheme()) // sötét gomb színséma
+    );
+
+    // Setup gomb jobb alsó sarokban
+
+    addChild(std::make_shared<UIButton>(
+        2,                                                            // Setup gomb azonosítója
+        Rect(tft.width() - UIButton::DEFAULT_BUTTON_WIDTH - MARGIN,   // x
+             tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT - MARGIN, // y
+             UIButton::DEFAULT_BUTTON_WIDTH,                          // szélesség
+             UIButton::DEFAULT_BUTTON_HEIGHT),                        // magasság
+        "Setup",                                                      //
+        UIButton::ButtonType::Pushable,
+        [this](const UIButton::ButtonEvent &event) {
+            if (event.state == UIButton::EventButtonState::Clicked) {
+                getScreenManager()->switchToScreen(SCREEN_NAME_SETUP);
+            }
+        },
+        UIColorPalette::createDarkButtonScheme()) // sötét gomb színséma
+    );
 }
 
-void ScreenMain::updateTraffipaxSiren(unsigned long currentTime) {
-    if (!traffipaxSiren.active) {
-        return;
-    }
+/**
+ * @brief Callback függvény, amit a Config hív meg változás esetén
+ */
+void ScreenMain::onConfigChanged() {
+    DEBUG("ScreenMain::onConfigChanged() - Konfiguráció frissítése.\n");
+    //_isTraffiAlarmEnabled = config.data.gpsTraffiAlarmEnabled;
+    //_isBeeperEnabled = config.data.beeperEnabled;
+    //_gpsTraffiAlarmDistance = config.data.gpsTraffiAlarmDistance;
+    //_isGpsTraffiSirenAlarmEnabled = config.data.gpsTraffiSirenAlarmEnabled;
 
-    if (currentTime < traffipaxSiren.nextStepTime) {
-        return;
-    }
+    // Ha a mód megváltozott, a méterek újrarajzolásának kényszerítése
+    // if (_isExternalVoltageMode != config.data.externalVoltageMode || _isExternalTemperatureMode != config.data.externalTemperatureMode) {
+    //    lastVerticalLinearSpriteUpdate = 0;
+    //}
+    //_isExternalVoltageMode = config.data.externalVoltageMode;
+    //_isExternalTemperatureMode = config.data.externalTemperatureMode;
 
-    if (traffipaxSiren.step == 0) {
-        noTone(PIN_BUZZER);
-        tone(PIN_BUZZER, 1800);
-        traffipaxSiren.step = 1;
-        traffipaxSiren.nextStepTime = currentTime + 50;
+    forceRedraw = true;
+}
+
+/**
+ * @brief Képernyő aktiválása
+ *
+ * Meghívódik amikor a képernyő aktívvá válik (pl. visszatérés Info/Setup képernyőről)
+ */
+void ScreenMain::activate() {
+
+    hudState.initialized = false;
+    hudState.staticPainted = false;
+    hudState.lastDrawnSpeed = -1000.0f;
+    hudState.lastRedrawMs = 0;
+    hudState.lastVoltageValue = -1000.0f;
+    hudState.lastVoltageMode = !config.data.externalVoltageMode;
+    hudState.lastTemperatureValue = -1000.0f;
+    hudState.lastTemperatureMode = !config.data.externalTemperatureMode;
+    std::strcpy(hudState.lastSatText, "");
+    std::strcpy(hudState.lastTimeText, "");
+    std::strcpy(hudState.lastAltText, "");
+    std::strcpy(hudState.lastBottomText, "");
+    hudState.lastSatColor = 0;
+    hudState.lastTimeColor = 0;
+    hudState.lastAltColor = 0;
+    traffipaxAlertController.reset();
+
+    // Beállítjuk a kényszerített újrarajzolás flag-et
+    this->forceRedraw = true;
+
+    // a következő ciklusban kényszerítjük az újrarajzolást
+    markForRedraw(true); // a képernyőt és a gyerekeit  újrarajzolásra jelöljük
+
+    // Ős activate() metódus hívása
+    UIScreen::activate();
+}
+
+/**
+ * Kezeli a képernyő saját ciklusát (dinamikus frissítés)
+ */
+void ScreenMain::handleOwnLoop() {
+
+    const float targetSpeed = (c1_sharedGpsData.speedValid) ? c1_sharedGpsData.speedKmph : 0.0f;
+
+    if (!hudState.initialized) {
+        hudState.smoothSpeed = targetSpeed;
+        hudState.initialized = true;
     } else {
-        stopTraffipaxSiren();
+        hudState.smoothSpeed += (targetSpeed - hudState.smoothSpeed) * 0.24f;
+    }
+
+    if (!Utils::timeHasPassed(hudState.lastRedrawMs, HUD_UPDATE_INTERVAL_MS)) {
+        return;
+    }
+
+    hudState.lastRedrawMs = millis();
+
+    const float delta = std::fabs(hudState.smoothSpeed - hudState.lastDrawnSpeed);
+    if (!forceRedraw && delta <= 0.35f && c1_sharedGpsData.speedValid) {
+        return;
+    }
+
+    forceRedraw = false;
+    hudState.lastDrawnSpeed = hudState.smoothSpeed;
+
+    const bool speedValid = c1_sharedGpsData.speedValid;
+    const bool timeValid = c1_sharedGpsData.timeValid;
+    const bool locationValid = c1_sharedGpsData.locationValid;
+    const bool voltageMode = config.data.externalVoltageMode;
+    const bool temperatureMode = config.data.externalTemperatureMode;
+
+    const float speedKmph = clampf(hudState.smoothSpeed, 0.0f, HUD_MAX_SPEED_KMPH);
+    const float voltageValue = voltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
+    const float temperatureValue = temperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
+    const uint8_t satelliteCount = c1_sharedGpsData.satelliteCountForUI;
+    const float hdop = c1_sharedGpsData.hdop;
+    const uint8_t hour = c1_sharedGpsData.hour;
+    const uint8_t minute = c1_sharedGpsData.minute;
+    const float altitudeM = c1_sharedGpsData.altitudeM;
+    const bool altitudeValid = c1_sharedGpsData.altitudeValid;
+    const uint8_t fixQuality = c1_sharedGpsData.fixQuality;
+    const uint8_t fixMode = c1_sharedGpsData.fixMode;
+    const bool voltageNeedsUpdate = forceRedraw || voltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
+    const bool temperatureNeedsUpdate = forceRedraw || temperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
+    const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
+
+    // Műholdak száma
+    char satText[24];
+    snprintf(satText, sizeof(satText), "%u SAT", satelliteCount);
+    const uint16_t satColor = locationValid ? TFT_GREEN : TFT_ORANGE;
+    if (std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor) {
+        drawHudPanelValue(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, satText, satColor);
+        std::strncpy(hudState.lastSatText, satText, sizeof(hudState.lastSatText) - 1);
+        hudState.lastSatText[sizeof(hudState.lastSatText) - 1] = '\0';
+        hudState.lastSatColor = satColor;
+    }
+
+    // Idő
+    char timeText[24];
+    if (timeValid) {
+        snprintf(timeText, sizeof(timeText), "%02u:%02u", hour, minute);
+    } else {
+        snprintf(timeText, sizeof(timeText), "--:--");
+    }
+    const uint16_t timeColor = timeValid ? TFT_CYAN : TFT_DARKGREY;
+    if (std::strcmp(timeText, hudState.lastTimeText) != 0 || timeColor != hudState.lastTimeColor) {
+        drawHudPanelValue(TIME_X, TIME_Y, TIME_W, TIME_H, timeText, timeColor);
+        std::strncpy(hudState.lastTimeText, timeText, sizeof(hudState.lastTimeText) - 1);
+        hudState.lastTimeText[sizeof(hudState.lastTimeText) - 1] = '\0';
+        hudState.lastTimeColor = timeColor;
+    }
+
+    // Jobb felső panel: magasság
+    char altText[24];
+    if (altitudeValid) {
+        snprintf(altText, sizeof(altText), "%d m", static_cast<int>(std::lroundf(altitudeM)));
+    } else {
+        snprintf(altText, sizeof(altText), "-- m");
+    }
+    const uint16_t altColor = altitudeValid ? TFT_CYAN : TFT_DARKGREY;
+    if (std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
+        drawHudPanelValue(PREC_X, PREC_Y, PREC_W, PREC_H, altText, altColor);
+        std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
+        hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
+        hudState.lastAltColor = altColor;
+    }
+
+    // Sebesség widget kirajzolása
+    drawSpeedWidget(speedKmph, speedValid);
+
+    if (anyBarNeedsUpdate) {
+        ensureSensorBarSpriteReady();
+        if (hudState.sensorBarSpriteReady) {
+            drawSensorBarSprite(voltageValue, voltageMode ? 3.5f : 2.7f, voltageMode ? 15.5f : 5.5f, voltageMode ? "Vbus" : "Vsys", "V", false);
+            drawSensorBarSprite(temperatureValue, -20.0f, 70.0f, temperatureMode ? "EXT" : "CPU", "C", true);
+        } else {
+            tft.fillRect(SENSOR_BAR_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
+            tft.fillRect(SENSOR_BAR_RIGHT_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
+        }
+
+        hudState.lastVoltageValue = voltageValue;
+        hudState.lastVoltageMode = voltageMode;
+        hudState.lastTemperatureValue = temperatureValue;
+        hudState.lastTemperatureMode = temperatureMode;
+    }
+
+    // Alsó információs sor szövege
+    char bottomText[128];
+    const bool hdopValid = (hdop > 0.0f && hdop < 99.0f);
+    if (hdopValid) {
+        snprintf(bottomText, sizeof(bottomText), "Q:%s  M:%s  HDOP:%.1f", GpsManager::qualityToString(fixQuality).c_str(), GpsManager::modeToString(fixMode).c_str(), hdop);
+    } else {
+        snprintf(bottomText, sizeof(bottomText), "Q:%s  M:%s  HDOP:--", GpsManager::qualityToString(fixQuality).c_str(), GpsManager::modeToString(fixMode).c_str());
+    }
+
+    // Alsó információs sor frissítése csak akkor, ha változott
+    if (std::strcmp(bottomText, hudState.lastBottomText) != 0) {
+        tft.fillRect(INFO_X + 2, INFO_Y + 2, INFO_W - 4, INFO_H - 4, tft.color565(6, 14, 22));
+        tft.setTextDatum(MC_DATUM);
+        tft.setFreeFont();
+        tft.setTextSize(1);
+        tft.setTextColor(tft.color565(170, 220, 255), tft.color565(6, 14, 22));
+        tft.drawString(bottomText, INFO_X + (INFO_W / 2), INFO_Y + (INFO_H / 2));
+        std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
+        hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
+    }
+
+    // Traffipax közeledés / távolodás figyelmeztetés
+    const TraffipaxAlertController::ConfigSnapshot traffiCfg{config.data.gpsTraffiAlarmEnabled, config.data.gpsTraffiSirenAlarmEnabled, config.data.beeperEnabled, config.data.gpsTraffiAlarmDistance};
+    const auto traffiResult = traffipaxAlertController.update(c1_sharedGpsData.lat, c1_sharedGpsData.lng, c1_sharedGpsData.locationValid, traffiCfg, millis(), tft, traffipaxManager);
+    if (traffiResult.baseAreaNeedsRestore) {
+        drawTraffipaxBaseArea();
+    }
+    if (traffiResult.hudNeedsRepaint) {
+        hudState.staticPainted = false;
+        hudState.lastRedrawMs = 0;
+        forceRedraw = true;
     }
 }
 
+/**
+ * @brief Touch esemény kezelése - hőmérsékleti mód váltás
+ * @param event A touch esemény, amely tartalmazza a koordinátákat és a lenyomás állapotát.
+ * @return true, ha a touch eseményt kezelte a képernyő, false egyébként
+ */
+bool ScreenMain::handleTouch(const TouchEvent &event) {
+
+    // Csak lenyomás eseményre reagálunk
+    if (!event.pressed) {
+        return UIScreen::handleTouch(event); // Továbbítjuk az ősosztálynak
+    }
+
+    // Bal oldali függőleges bar: feszültségmérés mód váltás
+    if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+        config.data.externalVoltageMode = !config.data.externalVoltageMode;
+        config.checkSave();
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
+    // Jobb oldali függőleges bar: hőmérsékletmérés mód váltás
+    if (event.x >= SENSOR_BAR_RIGHT_X && event.x < SENSOR_BAR_RIGHT_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+        config.data.externalTemperatureMode = !config.data.externalTemperatureMode;
+        config.checkSave();
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
+    // Ha nem volt találat, továbbítjuk az alaposztálynak
+    return UIScreen::handleTouch(event);
+}
+
+/**
+ * Kirajzolja a képernyő saját tartalmát (futurisztikus HUD)
+ */
+void ScreenMain::drawContent() {
+
+    if (!hudState.staticPainted) {
+        drawStaticHudBackground();
+        hudState.staticPainted = true;
+    }
+
+    forceRedraw = true;
+    handleOwnLoop();
+}
+
+/**
+ * @brief Traffipax riasztás sáv kirajzolása a képernyő tetejére
+ */
 void ScreenMain::drawTraffipaxBaseArea() {
+
+    constexpr int16_t TRAFFI_ALERT_H = 48;
     for (int16_t y = 0; y < TRAFFI_ALERT_H; y++) {
         const uint16_t bg = tft.color565(0, 40 + (y * 60) / tft.height(), 80 + (y * 100) / tft.height());
         tft.drawFastHLine(0, y, tft.width(), bg);
@@ -55,146 +337,7 @@ void ScreenMain::drawTraffipaxBaseArea() {
     // A top HUD elemei, amelyek az alert sáv alatt is látszanak, ha nincs riasztás
     drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "TRACK", "--", TFT_DARKGREY);
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "LOCAL", "--:--", TFT_DARKGREY);
-    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "PREC", "HDOP --", TFT_DARKGREY);
-}
-
-void ScreenMain::clearTraffipaxAlert() {
-    drawTraffipaxBaseArea();
-    stopTraffipaxSiren();
-}
-
-void ScreenMain::displayTraffipaxAlert(const TraffipaxManager::TraffipaxRecord *traffipax, double distance, ScreenMain::TraffipaxAlertState::State state) {
-    if (traffipax == nullptr) {
-        return;
-    }
-
-    uint16_t backgroundColor = TFT_RED;
-    uint16_t textColor = TFT_WHITE;
-    if (state == TraffipaxAlertState::DEPARTING) {
-        backgroundColor = TFT_ORANGE;
-        textColor = TFT_BLACK;
-    }
-
-    tft.fillRect(0, TRAFFI_ALERT_Y, tft.width(), TRAFFI_ALERT_H, backgroundColor);
-    tft.setFreeFont();
-    tft.setTextColor(textColor, backgroundColor);
-
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextSize(2);
-    tft.drawString(traffipax->city, 8, 8);
-
-    tft.setTextSize(1);
-    tft.drawString(traffipax->street_or_km, 8, 28);
-
-    char distanceText[16];
-    snprintf(distanceText, sizeof(distanceText), "%dm", static_cast<int>(std::lround(distance)));
-    tft.setTextDatum(MR_DATUM);
-    tft.setFreeFont(&FreeSerifBold24pt7b);
-    tft.setTextSize(1);
-    tft.setTextPadding(tft.textWidth("8888m"));
-    tft.drawString(distanceText, tft.width() - 8, TRAFFI_ALERT_H / 2);
-    tft.setFreeFont();
-}
-
-void ScreenMain::processTraffipaxAlert(double currentLat, double currentLon, bool positionValid, bool &forceRedrawFlag) {
-
-    if (!positionValid || !config.data.gpsTraffiAlarmEnabled) {
-        stopTraffipaxSiren();
-        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
-            traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
-            traffipaxAlert.activeTraffipax = nullptr;
-            traffipaxAlert.currentDistance = 0.0;
-            clearTraffipaxAlert();
-            hudState.staticPainted = false;
-            hudState.lastRedrawMs = 0;
-            forceRedrawFlag = true;
-        }
-        traffiOutOfRangeStart = 0;
-        return;
-    }
-
-    double minDistance = 999999.0;
-    const TraffipaxManager::TraffipaxRecord *closestTraffipax = traffipaxManager.getClosestTraffipax(currentLat, currentLon, minDistance);
-    const unsigned long currentTime = millis();
-
-    if (closestTraffipax == nullptr) {
-        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
-            traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
-            traffipaxAlert.activeTraffipax = nullptr;
-            clearTraffipaxAlert();
-            hudState.staticPainted = false;
-            hudState.lastRedrawMs = 0;
-            forceRedrawFlag = true;
-        }
-        traffiOutOfRangeStart = 0;
-        return;
-    }
-
-    if (minDistance > config.data.gpsTraffiAlarmDistance) {
-        if (traffiOutOfRangeStart == 0) {
-            traffiOutOfRangeStart = currentTime;
-        }
-
-        if (currentTime - traffiOutOfRangeStart > TRAFFI_ALERT_OUT_OF_RANGE_CLEAR_MS) {
-            if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE) {
-                traffipaxAlert.currentState = TraffipaxAlertState::INACTIVE;
-                traffipaxAlert.activeTraffipax = nullptr;
-                clearTraffipaxAlert();
-                hudState.staticPainted = false;
-                hudState.lastRedrawMs = 0;
-                forceRedrawFlag = true;
-            }
-            traffiOutOfRangeStart = 0;
-            return;
-        }
-
-        if (traffipaxAlert.currentState != TraffipaxAlertState::INACTIVE && traffipaxAlert.activeTraffipax) {
-            traffipaxAlert.currentDistance = minDistance;
-            displayTraffipaxAlert(traffipaxAlert.activeTraffipax, minDistance, traffipaxAlert.currentState);
-        }
-        return;
-    }
-
-    traffiOutOfRangeStart = 0;
-
-    const bool isApproaching = minDistance < (traffipaxAlert.lastDistance - TRAFFI_ALERT_DISTANCE_EPSILON_M);
-    const bool isDeparting = minDistance > (traffipaxAlert.lastDistance + TRAFFI_ALERT_DISTANCE_EPSILON_M);
-    const bool isStoppedNear = !isApproaching && !isDeparting && minDistance <= config.data.gpsTraffiAlarmDistance;
-
-    TraffipaxAlertState::State newState = traffipaxAlert.currentState;
-    if (traffipaxAlert.currentState == TraffipaxAlertState::INACTIVE) {
-        newState = TraffipaxAlertState::APPROACHING;
-    } else if (isApproaching) {
-        newState = TraffipaxAlertState::APPROACHING;
-    } else if (isDeparting) {
-        newState = TraffipaxAlertState::DEPARTING;
-    } else if (isStoppedNear) {
-        newState = TraffipaxAlertState::NEARBY_STOPPED;
-    }
-
-    if (newState != traffipaxAlert.currentState) {
-        traffipaxAlert.currentState = newState;
-        traffipaxAlert.activeTraffipax = closestTraffipax;
-        forceRedrawFlag = true;
-        hudState.staticPainted = false;
-        if (newState != TraffipaxAlertState::APPROACHING) {
-            stopTraffipaxSiren();
-        }
-    }
-
-    traffipaxAlert.currentDistance = minDistance;
-    displayTraffipaxAlert(closestTraffipax, minDistance, traffipaxAlert.currentState);
-
-    if (config.data.gpsTraffiSirenAlarmEnabled && traffipaxAlert.currentState == TraffipaxAlertState::APPROACHING) {
-        if (currentTime - traffipaxAlert.lastSirenTime >= TRAFFI_ALERT_SIREN_INTERVAL_MS) {
-            startTraffipaxSiren(currentTime);
-            traffipaxAlert.lastSirenTime = currentTime;
-        }
-    }
-
-    updateTraffipaxSiren(currentTime);
-
-    traffipaxAlert.lastDistance = minDistance;
+    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "ALT", "-- m", TFT_DARKGREY);
 }
 
 /**
@@ -234,6 +377,7 @@ uint16_t ScreenMain::arcColorForRatio(float ratio) {
 
 /**
  * @brief Színezés a függőleges meterhez a kitöltési arány alapján
+ *
  * @param ratio A kitöltési arány
  * @param temperatureBar true, ha hőmérséklet meter, false ha feszültség meter
  */
@@ -270,7 +414,8 @@ uint16_t ScreenMain::meterColorForRatio(float ratio, bool temperatureBar) {
 }
 
 /**
- * @brief HUD panel kirajzolása
+ * @brief HUD (Head-Up Display) panel kirajzolása
+ *
  * @param x A panel bal felső sarkának X koordinátája
  * @param y A panel bal felső sarkának Y koordinátája
  * @param w A panel szélessége
@@ -298,7 +443,8 @@ void ScreenMain::drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const 
 }
 
 /**
- * @brief HUD panel érték kirajzolása
+ * @brief HUD (Head-Up Display) panel érték kirajzolása
+ *
  * @param x A panel bal felső sarkának X koordinátája
  * @param y A panel bal felső sarkának Y koordinátája
  * @param w A panel szélessége
@@ -433,7 +579,7 @@ template <typename Canvas> void ScreenMain::drawSpeedArc(Canvas &canvas, float s
 }
 
 /**
- * @brief Statikus HUD háttér kirajzolása
+ * @brief Statikus HUD (Head-Up Display) háttér kirajzolása
  * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik, vagy amikor a képernyő teljes újrarajzolása szükséges.
  *
  */
@@ -449,7 +595,7 @@ void ScreenMain::drawStaticHudBackground() {
 
     drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "TRACK", "--", TFT_DARKGREY);
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "LOCAL", "--:--", TFT_DARKGREY);
-    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "PREC", "HDOP --", TFT_DARKGREY);
+    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "ALT", "-- m", TFT_DARKGREY);
 
     tft.fillRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(6, 14, 22));
     tft.drawRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(0, 132, 214));
@@ -514,7 +660,7 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid) {
         speedSprite.setFreeFont();
         speedSprite.setTextSize(2);
         speedSprite.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
-        speedSprite.drawString("km/h", 106, 100);
+        speedSprite.drawString("km/h", 106, 110);
 
         speedSprite.pushSprite(SPEED_X, SPEED_Y);
         return;
@@ -540,306 +686,4 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid) {
     tft.setTextSize(2);
     tft.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
     tft.drawString("km/h", 160, 150);
-}
-
-/**
- * @brief ScreenMain konstruktor
- */
-ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft) {
-
-    DEBUG("ScreenMain: Constructor called\n");
-
-    // Feliratkozás a config változásokra
-    configCallbackId = config.registerChangeCallback([this]() { this->onConfigChanged(); });
-
-    // UI komponensek elhelyezése
-    layoutComponents();
-
-    // Kezdeti érték beállítása
-    onConfigChanged();
-}
-
-/**
- * @brief ScreenMain destruktor
- */
-ScreenMain::~ScreenMain() { config.unregisterCallback(configCallbackId); }
-
-/**
- * UI komponensek elhelyezése
- */
-void ScreenMain::layoutComponents() {
-    // Info gomb bal alsó sarokban
-    {
-        const uint16_t margin = 4;
-        addChild(std::make_shared<UIButton>(
-            1,                                                                                                                                      // Info gomb azonosítója
-            Rect(margin, tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT - margin, UIButton::DEFAULT_BUTTON_WIDTH, UIButton::DEFAULT_BUTTON_HEIGHT), // bal alsó sarok, margóval
-            "Info",                                                                                                                                 //
-            UIButton::ButtonType::Pushable,
-            [this](const UIButton::ButtonEvent &event) {
-                if (event.state == UIButton::EventButtonState::Clicked) {
-                    getScreenManager()->switchToScreen(SCREEN_NAME_INFO);
-                }
-            },
-            UIColorPalette::createDarkButtonScheme()) // sötét gomb színséma
-        );
-    }
-
-    // Setup gomb jobb alsó sarokban
-    {
-        const uint16_t margin = 4;
-        addChild(std::make_shared<UIButton>(
-            2, // Setup gomb azonosítója
-            Rect(tft.width() - UIButton::DEFAULT_BUTTON_WIDTH - margin, tft.height() - UIButton::DEFAULT_BUTTON_HEIGHT - margin, UIButton::DEFAULT_BUTTON_WIDTH,
-                 UIButton::DEFAULT_BUTTON_HEIGHT), // jobb alsó sarok, margóval
-            "Setup",                               //
-            UIButton::ButtonType::Pushable,
-            [this](const UIButton::ButtonEvent &event) {
-                if (event.state == UIButton::EventButtonState::Clicked) {
-                    getScreenManager()->switchToScreen(SCREEN_NAME_SETUP);
-                }
-            },
-            UIColorPalette::createDarkButtonScheme()) // sötét gomb színséma
-        );
-    }
-}
-
-/**
- * @brief Callback függvény, amit a Config hív meg változás esetén
- */
-void ScreenMain::onConfigChanged() {
-    DEBUG("ScreenMain::onConfigChanged() - Konfiguráció frissítése.\n");
-    //_isTraffiAlarmEnabled = config.data.gpsTraffiAlarmEnabled;
-    //_isBeeperEnabled = config.data.beeperEnabled;
-    //_gpsTraffiAlarmDistance = config.data.gpsTraffiAlarmDistance;
-    //_isGpsTraffiSirenAlarmEnabled = config.data.gpsTraffiSirenAlarmEnabled;
-
-    // Ha a mód megváltozott, a méterek újrarajzolásának kényszerítése
-    // if (_isExternalVoltageMode != config.data.externalVoltageMode || _isExternalTemperatureMode != config.data.externalTemperatureMode) {
-    //    lastVerticalLinearSpriteUpdate = 0;
-    //}
-    //_isExternalVoltageMode = config.data.externalVoltageMode;
-    //_isExternalTemperatureMode = config.data.externalTemperatureMode;
-
-    forceRedraw = true;
-}
-
-/**
- * @brief Képernyő aktiválása
- *
- * Meghívódik amikor a képernyő aktívvá válik (pl. visszatérés Info/Setup képernyőről)
- */
-void ScreenMain::activate() {
-
-    hudState.initialized = false;
-    hudState.staticPainted = false;
-    hudState.lastDrawnSpeed = -1000.0f;
-    hudState.lastRedrawMs = 0;
-    hudState.lastVoltageValue = -1000.0f;
-    hudState.lastVoltageMode = !config.data.externalVoltageMode;
-    hudState.lastTemperatureValue = -1000.0f;
-    hudState.lastTemperatureMode = !config.data.externalTemperatureMode;
-    std::strcpy(hudState.lastSatText, "");
-    std::strcpy(hudState.lastTimeText, "");
-    std::strcpy(hudState.lastHdopText, "");
-    std::strcpy(hudState.lastBottomText, "");
-    hudState.lastSatColor = 0;
-    hudState.lastTimeColor = 0;
-    hudState.lastHdopColor = 0;
-
-    // Beállítjuk a kényszerített újrarajzolás flag-et
-    this->forceRedraw = true;
-
-    // a következő ciklusban kényszerítjük az újrarajzolást
-    markForRedraw(true); // a képernyőt és a gyerekeit  újrarajzolásra jelöljük
-
-    // Ős activate() metódus hívása
-    UIScreen::activate();
-}
-
-/**
- * Kezeli a képernyő saját ciklusát (dinamikus frissítés)
- */
-void ScreenMain::handleOwnLoop() {
-
-    const float targetSpeed = (c1_sharedGpsData.speedValid) ? c1_sharedGpsData.speedKmph : 0.0f;
-
-    if (!hudState.initialized) {
-        hudState.smoothSpeed = targetSpeed;
-        hudState.initialized = true;
-    } else {
-        hudState.smoothSpeed += (targetSpeed - hudState.smoothSpeed) * 0.24f;
-    }
-
-    if (!Utils::timeHasPassed(hudState.lastRedrawMs, HUD_UPDATE_INTERVAL_MS)) {
-        return;
-    }
-
-    hudState.lastRedrawMs = millis();
-
-    const float delta = std::fabs(hudState.smoothSpeed - hudState.lastDrawnSpeed);
-    if (!forceRedraw && delta <= 0.35f && c1_sharedGpsData.speedValid) {
-        return;
-    }
-
-    forceRedraw = false;
-    hudState.lastDrawnSpeed = hudState.smoothSpeed;
-
-    const bool speedValid = c1_sharedGpsData.speedValid;
-    const bool timeValid = c1_sharedGpsData.timeValid;
-    const bool locationValid = c1_sharedGpsData.locationValid;
-    const bool voltageMode = config.data.externalVoltageMode;
-    const bool temperatureMode = config.data.externalTemperatureMode;
-
-    const float speedKmph = clampf(hudState.smoothSpeed, 0.0f, HUD_MAX_SPEED_KMPH);
-    const float voltageValue = voltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
-    const float temperatureValue = temperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
-    const uint8_t satelliteCount = c1_sharedGpsData.satelliteCountForUI;
-    const float hdop = c1_sharedGpsData.hdop;
-    const uint8_t hour = c1_sharedGpsData.hour;
-    const uint8_t minute = c1_sharedGpsData.minute;
-    const float altitudeM = c1_sharedGpsData.altitudeM;
-    const bool altitudeValid = c1_sharedGpsData.altitudeValid;
-    const uint8_t fixQuality = c1_sharedGpsData.fixQuality;
-    const uint8_t fixMode = c1_sharedGpsData.fixMode;
-    const float courseDeg = c1_sharedGpsData.courseDeg;
-    const uint32_t bootSec = c1_sharedGpsData.gpsBootTime;
-    const bool voltageNeedsUpdate = forceRedraw || voltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
-    const bool temperatureNeedsUpdate = forceRedraw || temperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
-    const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
-
-    // Műholdak száma
-    char satText[24];
-    snprintf(satText, sizeof(satText), "%u SAT", satelliteCount);
-    const uint16_t satColor = locationValid ? TFT_GREEN : TFT_ORANGE;
-    if (std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor) {
-        drawHudPanelValue(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, satText, satColor);
-        std::strncpy(hudState.lastSatText, satText, sizeof(hudState.lastSatText) - 1);
-        hudState.lastSatText[sizeof(hudState.lastSatText) - 1] = '\0';
-        hudState.lastSatColor = satColor;
-    }
-
-    // Idő
-    char timeText[24];
-    if (timeValid) {
-        snprintf(timeText, sizeof(timeText), "%02u:%02u", hour, minute);
-    } else {
-        snprintf(timeText, sizeof(timeText), "--:--");
-    }
-    const uint16_t timeColor = timeValid ? TFT_CYAN : TFT_DARKGREY;
-    if (std::strcmp(timeText, hudState.lastTimeText) != 0 || timeColor != hudState.lastTimeColor) {
-        drawHudPanelValue(TIME_X, TIME_Y, TIME_W, TIME_H, timeText, timeColor);
-        std::strncpy(hudState.lastTimeText, timeText, sizeof(hudState.lastTimeText) - 1);
-        hudState.lastTimeText[sizeof(hudState.lastTimeText) - 1] = '\0';
-        hudState.lastTimeColor = timeColor;
-    }
-
-    // Pontosság (HDOP)
-    char hdopText[24];
-    snprintf(hdopText, sizeof(hdopText), "HDOP %.1f", hdop);
-    const uint16_t hdopColor = (hdop > 0.0f && hdop < 2.5f) ? TFT_GREEN : TFT_ORANGE;
-    if (std::strcmp(hdopText, hudState.lastHdopText) != 0 || hdopColor != hudState.lastHdopColor) {
-        drawHudPanelValue(PREC_X, PREC_Y, PREC_W, PREC_H, hdopText, hdopColor);
-        std::strncpy(hudState.lastHdopText, hdopText, sizeof(hudState.lastHdopText) - 1);
-        hudState.lastHdopText[sizeof(hudState.lastHdopText) - 1] = '\0';
-        hudState.lastHdopColor = hdopColor;
-    }
-
-    // Sebesség widget kirajzolása
-    drawSpeedWidget(speedKmph, speedValid);
-
-    if (anyBarNeedsUpdate) {
-        ensureSensorBarSpriteReady();
-        if (hudState.sensorBarSpriteReady) {
-            drawSensorBarSprite(voltageValue, voltageMode ? 3.5f : 2.7f, voltageMode ? 15.5f : 5.5f, voltageMode ? "Vbus" : "Vsys", "V", false);
-            drawSensorBarSprite(temperatureValue, -20.0f, 70.0f, temperatureMode ? "EXT" : "CPU", "C", true);
-        } else {
-            tft.fillRect(SENSOR_BAR_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
-            tft.fillRect(SENSOR_BAR_RIGHT_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
-        }
-
-        hudState.lastVoltageValue = voltageValue;
-        hudState.lastVoltageMode = voltageMode;
-        hudState.lastTemperatureValue = temperatureValue;
-        hudState.lastTemperatureMode = temperatureMode;
-    }
-
-    // Alsó információs sor szövege
-    char bottomText[128];
-    if (altitudeValid) {
-        snprintf(bottomText, sizeof(bottomText), "Q:%s  M:%s  CRS:%03d  ALT:%dm  T+%lus", GpsManager::qualityToString(fixQuality).c_str(), GpsManager::modeToString(fixMode).c_str(),
-                 static_cast<int>(std::lroundf(courseDeg)), static_cast<int>(std::lroundf(altitudeM)), static_cast<unsigned long>(bootSec));
-    } else {
-        snprintf(bottomText, sizeof(bottomText), "Q:%s  M:%s  CRS:%03d  ALT:--  T+%lus", GpsManager::qualityToString(fixQuality).c_str(), GpsManager::modeToString(fixMode).c_str(),
-                 static_cast<int>(std::lroundf(courseDeg)), static_cast<unsigned long>(bootSec));
-    }
-
-    // Alsó információs sor frissítése csak akkor, ha változott
-    if (std::strcmp(bottomText, hudState.lastBottomText) != 0) {
-        tft.fillRect(INFO_X + 2, INFO_Y + 2, INFO_W - 4, INFO_H - 4, tft.color565(6, 14, 22));
-        tft.setTextDatum(TL_DATUM);
-        tft.setFreeFont();
-        tft.setTextSize(1);
-        tft.setTextColor(tft.color565(170, 220, 255), tft.color565(6, 14, 22));
-        tft.drawString(bottomText, INFO_X + 8, INFO_Y + 8);
-        std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
-        hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
-    }
-
-    // Traffipax közeledés / távolodás figyelmeztetés
-    processTraffipaxAlert(c1_sharedGpsData.lat, c1_sharedGpsData.lng, c1_sharedGpsData.locationValid, forceRedraw);
-}
-
-/**
- * @brief Touch esemény kezelése - hőmérsékleti mód váltás
- * @param event A touch esemény, amely tartalmazza a koordinátákat és a lenyomás állapotát.
- * @return true, ha a touch eseményt kezelte a képernyő, false egyébként
- */
-bool ScreenMain::handleTouch(const TouchEvent &event) {
-
-    // Csak lenyomás eseményre reagálunk
-    if (!event.pressed) {
-        return UIScreen::handleTouch(event); // Továbbítjuk az ősosztálynak
-    }
-
-    // Bal oldali függőleges bar: feszültségmérés mód váltás
-    if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
-        config.data.externalVoltageMode = !config.data.externalVoltageMode;
-        config.checkSave();
-        forceRedraw = true;
-        hudState.lastRedrawMs = 0;
-        if (config.data.beeperEnabled) {
-            Utils::beepTick();
-        }
-        return true;
-    }
-
-    // Jobb oldali függőleges bar: hőmérsékletmérés mód váltás
-    if (event.x >= SENSOR_BAR_RIGHT_X && event.x < SENSOR_BAR_RIGHT_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
-        config.data.externalTemperatureMode = !config.data.externalTemperatureMode;
-        config.checkSave();
-        forceRedraw = true;
-        hudState.lastRedrawMs = 0;
-        if (config.data.beeperEnabled) {
-            Utils::beepTick();
-        }
-        return true;
-    }
-
-    // Ha nem volt találat, továbbítjuk az alaposztálynak
-    return UIScreen::handleTouch(event);
-}
-
-/**
- * Kirajzolja a képernyő saját tartalmát (futurisztikus HUD)
- */
-void ScreenMain::drawContent() {
-
-    if (!hudState.staticPainted) {
-        drawStaticHudBackground();
-        hudState.staticPainted = true;
-    }
-
-    forceRedraw = true;
-    handleOwnLoop();
 }
