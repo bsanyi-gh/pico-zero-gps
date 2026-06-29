@@ -484,7 +484,7 @@ void ScreenMain::ensureSensorBarSpriteReady() {
     }
 
     // Sprite legyártása, ha még nem létezik
-    sensorBarSprite.setColorDepth(8);
+    sensorBarSprite.setColorDepth(16); // A Sprite háttere vegye fel a képernyő hátterének színét, így a sprite átlátszó lesz a háttér előtt.
     hudState.sensorBarSpriteReady = sensorBarSprite.createSprite(SENSOR_BAR_W, SENSOR_BAR_H) != nullptr;
 }
 
@@ -569,7 +569,8 @@ void ScreenMain::ensureSpeedSpriteReady() {
         return;
     }
 
-    speedSprite.setColorDepth(8);
+    // Sprite legyártása, ha még nem létezik
+    speedSprite.setColorDepth(16); // A Sprite háttere vegye fel a képernyő hátterének színét, így a sprite átlátszó lesz a háttér előtt.
     hudState.speedSpriteReady = speedSprite.createSprite(hudState.speedValueW, hudState.speedValueH) != nullptr;
 }
 
