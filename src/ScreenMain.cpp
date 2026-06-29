@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "LinearMeter.h"
 #include "ScreenMain.h"
 #include "defines.h"
 
@@ -10,7 +11,7 @@ extern TraffipaxManager traffipaxManager;
 /**
  * @brief ScreenMain konstruktor
  */
-ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft) {
+ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft), SENSOR_BAR_X_RIGHT(tft.width() - SENSOR_BAR_W) {
 
     DEBUG("ScreenMain: Constructor called\n");
 
@@ -36,7 +37,6 @@ void ScreenMain::layoutComponents() {
     constexpr uint16_t MARGIN = 1;
 
     // Info gomb bal alsó sarokban
-
     addChild(std::make_shared<UIButton>(
         1,                                                            // Info gomb azonosítója
         Rect(MARGIN,                                                  // x
@@ -54,7 +54,6 @@ void ScreenMain::layoutComponents() {
     );
 
     // Setup gomb jobb alsó sarokban
-
     addChild(std::make_shared<UIButton>(
         2,                                                            // Setup gomb azonosítója
         Rect(tft.width() - UIButton::DEFAULT_BUTTON_WIDTH - MARGIN,   // x
@@ -215,14 +214,47 @@ void ScreenMain::handleOwnLoop() {
     // Sebesség widget kirajzolása
     drawSpeedWidget(speedKmph, speedValid, forceUpdate);
 
+    // Függőleges bar-ok frissítése, ha szükséges
     if (anyBarNeedsUpdate) {
+
+        // Sprite legyártása, ha még nem létezik
         ensureSensorBarSpriteReady();
+
+        // Ha a sprite létrejött, kirajzoljuk a bar-okat
         if (hudState.sensorBarSpriteReady) {
-            drawSensorBarSprite(voltageValue, voltageMode ? 3.5f : 2.7f, voltageMode ? 15.5f : 5.5f, voltageMode ? "Vbus" : "Vsys", "V", false);
-            drawSensorBarSprite(temperatureValue, -20.0f, 70.0f, temperatureMode ? "EXT" : "CPU", "C", true);
-        } else {
-            tft.fillRect(SENSOR_BAR_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
-            tft.fillRect(SENSOR_BAR_RIGHT_X, SENSOR_BAR_Y, SENSOR_BAR_W, SENSOR_BAR_H, TFT_BLACK);
+
+            //  Vertical Line bar - Battery (sprite-os)
+            verticalLinearMeter(&sensorBarSprite,                                    //
+                                SENSOR_BAR_H,                                        //
+                                SENSOR_BAR_W,                                        //
+                                voltageMode ? "Vbus [V]" : "Vsys [V]",               // Feszmérő mód: true = VBus, false = VSys
+                                voltageValue,                                        // value
+                                voltageMode ? VBUS_BARMETER_MIN : VSYS_BARMETER_MIN, // minVal
+                                voltageMode ? VBUS_BARMETER_MAX : VSYS_BARMETER_MAX, // maxVal
+                                SENSOR_BAR_X,                                        // x
+                                SENSOR_BAR_Y_BOTTOM,                                 // y: sprite alsó éle
+                                25,                                                  // bar-w
+                                10,                                                  // bar-h
+                                1,                                                   // gap
+                                8,                                                   // n
+                                RED2GREEN);                                          // color
+
+            // Vertical Line bar - Temperature
+            verticalLinearMeter(&sensorBarSprite,                        //
+                                SENSOR_BAR_H,                            //
+                                SENSOR_BAR_W,                            //
+                                temperatureMode ? "Ext [C]" : "CPU [C]", // category
+                                temperatureValue,                        // value
+                                TEMP_BARMETER_MIN,                       // minVal
+                                TEMP_BARMETER_MAX,                       // maxVal
+                                SENSOR_BAR_X_RIGHT,                      // x: sprite szélesség beszámítva
+                                SENSOR_BAR_Y_BOTTOM,                     // y: sprite alsó éle
+                                25,                                      // bar-w
+                                10,                                      // bar-h
+                                1,                                       // gap
+                                8,                                       // n
+                                BLUE2RED,                                // color
+                                true);                                   // bal oldalt legyenek az értékek
         }
 
         hudState.lastVoltageValue = voltageValue;
@@ -278,7 +310,7 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
     }
 
     // Bal oldali függőleges bar: feszültségmérés mód váltás
-    if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+    if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y_TOP && event.y < SENSOR_BAR_Y_BOTTOM) {
         config.data.externalVoltageMode = !config.data.externalVoltageMode;
         config.checkSave();
         forceRedraw = true;
@@ -290,7 +322,7 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
     }
 
     // Jobb oldali függőleges bar: hőmérsékletmérés mód váltás
-    if (event.x >= SENSOR_BAR_RIGHT_X && event.x < SENSOR_BAR_RIGHT_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y && event.y < SENSOR_BAR_Y + SENSOR_BAR_H) {
+    if (event.x >= SENSOR_BAR_X_RIGHT && event.x < SENSOR_BAR_X_RIGHT + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y_TOP && event.y < SENSOR_BAR_Y_BOTTOM) {
         config.data.externalTemperatureMode = !config.data.externalTemperatureMode;
         config.checkSave();
         forceRedraw = true;
@@ -442,76 +474,16 @@ void ScreenMain::drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, c
 }
 
 /**
- * @brief Függőleges meter sprite rajzolása
- * @param value Mért érték
- * @param minVal Minimum érték
- * @param maxVal Maximum érték
- * @param title Címke a meter tetején
- * @param unit Mértékegység a bottom textben
- * @param temperatureBar true, ha hőmérséklet meter
- */
-void ScreenMain::drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar) {
-    const uint16_t spriteBg = tft.color565(6, 14, 22);
-    const uint16_t frameColor = tft.color565(0, 132, 214);
-    const uint16_t textColor = tft.color565(170, 220, 255);
-
-    sensorBarSprite.fillSprite(spriteBg);
-    sensorBarSprite.drawRoundRect(0, 0, SENSOR_BAR_W, SENSOR_BAR_H, 4, frameColor);
-
-    sensorBarSprite.setFreeFont();
-    sensorBarSprite.setTextSize(1);
-    sensorBarSprite.setTextDatum(MC_DATUM);
-    sensorBarSprite.setTextColor(textColor, spriteBg);
-    sensorBarSprite.drawString(title, SENSOR_BAR_W / 2, 8);
-
-    constexpr uint8_t BAR_SEGMENTS = 8;
-    constexpr int16_t BAR_W = 18;
-    constexpr int16_t BAR_H = 8;
-    constexpr int16_t BAR_GAP = 1;
-    const int16_t barX = (SENSOR_BAR_W - BAR_W) / 2;
-    const int16_t topSpace = 18;
-    const int16_t valueSpace = 16;
-    const int16_t barTotalH = BAR_SEGMENTS * BAR_H + (BAR_SEGMENTS - 1) * BAR_GAP;
-    const int16_t barStartY = topSpace + (SENSOR_BAR_H - topSpace - valueSpace - barTotalH) / 2;
-
-    float normalized = 0.0f;
-    if (maxVal > minVal) {
-        normalized = clampf((value - minVal) / (maxVal - minVal), 0.0f, 1.0f);
-    }
-    int filledSegments = static_cast<int>(std::lroundf(normalized * BAR_SEGMENTS));
-    if (filledSegments < 0) {
-        filledSegments = 0;
-    }
-    if (filledSegments > BAR_SEGMENTS) {
-        filledSegments = BAR_SEGMENTS;
-    }
-
-    for (int segment = 0; segment < BAR_SEGMENTS; segment++) {
-        const int16_t y = barStartY + (BAR_SEGMENTS - 1 - segment) * (BAR_H + BAR_GAP);
-        uint16_t color = TFT_DARKGREY;
-        if (segment < filledSegments) {
-            const float segmentRatio = static_cast<float>(segment + 1) / BAR_SEGMENTS;
-            color = meterColorForRatio(segmentRatio, temperatureBar);
-        }
-        sensorBarSprite.fillRoundRect(barX, y, BAR_W, BAR_H, 2, color);
-    }
-
-    char valueText[20];
-    snprintf(valueText, sizeof(valueText), "%.1f%s", value, unit);
-    sensorBarSprite.setTextColor(temperatureBar ? TFT_ORANGE : TFT_GREENYELLOW, spriteBg);
-    sensorBarSprite.drawString(valueText, SENSOR_BAR_W / 2, SENSOR_BAR_H - 10);
-
-    sensorBarSprite.pushSprite(temperatureBar ? SENSOR_BAR_RIGHT_X : SENSOR_BAR_X, SENSOR_BAR_Y);
-}
-
-/**
  * @brief Sensor bar sprite előkészítése, ha még nincs létrehozva
  */
 void ScreenMain::ensureSensorBarSpriteReady() {
+
+    // Ha a sprite már létezik, ellenőrizzük, hogy a mérete megfelelő-e
     if (hudState.sensorBarSpriteReady) {
         return;
     }
 
+    // Sprite legyártása, ha még nem létezik
     sensorBarSprite.setColorDepth(8);
     hudState.sensorBarSpriteReady = sensorBarSprite.createSprite(SENSOR_BAR_W, SENSOR_BAR_H) != nullptr;
 }

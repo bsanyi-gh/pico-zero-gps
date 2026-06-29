@@ -78,10 +78,11 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     // Függőleges sensor bar-ok pozíció és méret
     static constexpr int16_t SENSOR_BAR_X = 0;
-    static constexpr int16_t SENSOR_BAR_Y = 52;
-    static constexpr int16_t SENSOR_BAR_W = 52;
+    static constexpr int16_t SENSOR_BAR_Y_BOTTOM = 170;
+    static constexpr int16_t SENSOR_BAR_W = 67;
     static constexpr int16_t SENSOR_BAR_H = 118;
-    static constexpr int16_t SENSOR_BAR_RIGHT_X = 320 - SENSOR_BAR_W;
+    static constexpr int16_t SENSOR_BAR_Y_TOP = SENSOR_BAR_Y_BOTTOM - SENSOR_BAR_H;
+    const int16_t SENSOR_BAR_X_RIGHT;
 
     // Alsó információs sor (a két alsó gomb közötti sáv)
     static constexpr int16_t INFO_X = 56;
@@ -123,7 +124,9 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     ScreenMainHudState hudState;
     TFT_eSprite speedSprite;
+    // Sprite a vertikális bar-oknak
     TFT_eSprite sensorBarSprite;
+
     TraffipaxAlertController traffipaxAlertController;
 
     /**
@@ -146,7 +149,6 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor);
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
-    void drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar);
     void ensureSensorBarSpriteReady();
     void ensureSpeedSpriteReady();
     void updateSpeedValueLayoutForFont();
