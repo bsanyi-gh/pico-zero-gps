@@ -10,6 +10,14 @@ extern TftBackLightAdjuster tftBackLightAdjuster;
  */
 ScreenScreenSaver::ScreenScreenSaver() : UIScreen(SCREEN_NAME_SCREENSAVER) {
     DEBUG("ScreenScreenSaver: Constructor called\n");
+
+    // A tényleges, aktuális fontbeállítással mérjük a szöveg méretét.
+
+    tft.setTextFont(SCREENSAVER_TFT_FONT);
+    tft.setTextSize(1);
+    this->textW = tft.textWidth("88:88", SCREENSAVER_TFT_FONT);
+    this->textH = tft.fontHeight(SCREENSAVER_TFT_FONT);
+
     layoutComponents();
 }
 
@@ -31,6 +39,7 @@ void ScreenScreenSaver::layoutComponents() {}
 void ScreenScreenSaver::activate() {
 
     tft.fillScreen(TFT_BLACK);
+    tft.setFreeFont();
 
     // Kényszeríti a háttérvilágítást a minimum szintre
     tftBackLightAdjuster.setBacklightLevel(NIGHTLY_BRIGHTNESS);
@@ -71,30 +80,28 @@ void ScreenScreenSaver::handleOwnLoop() {
 
     // Idő
     char timeStr[9] = "--:--";
-
     if (c1_sharedGpsData.timeValid) {
         snprintf(timeStr, sizeof(timeStr), "%02d:%02d", c1_sharedGpsData.hour, c1_sharedGpsData.minute);
     }
 
-    constexpr uint8_t fontSize = 6;
+    constexpr int32_t MARGIN = 20;
 
-    tft.setFreeFont();
-    tft.setTextSize(fontSize);
+    // Véletlenszerű pozíció generálása a képernyőn belül (a teljes szöveg maradjon látható).
+    int32_t maxX = static_cast<int32_t>(::tft.width()) - this->textW - MARGIN;
+    int32_t maxY = static_cast<int32_t>(::tft.height()) - this->textH - MARGIN;
+    if (maxX < MARGIN) {
+        maxX = MARGIN;
+    }
+    if (maxY < MARGIN) {
+        maxY = MARGIN;
+    }
 
-    static uint32_t lastX = 0, lastY = 0;
-    constexpr uint8_t margin = 20;
-    constexpr uint8_t fontHeight = 48;
-    uint8_t fontWidth = tft.textWidth("88:88", fontSize); // Szélesség fix, mert mindig ugyanaz a karakterkészlet
-
-    // Véletlenszerű pozíció generálása a képernyőn belül
-    uint32_t maxX = ::tft.width() - fontWidth - margin;
-    uint32_t maxY = ::tft.height() - fontHeight - margin;
-    lastX = random(margin, maxX);
-    lastY = random(margin, maxY);
+    this->lastX = random(MARGIN, maxX + 1);
+    this->lastY = random(MARGIN, maxY + 1);
 
     // Kirajzolás
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString(timeStr, lastX, lastY);
+    tft.drawString(timeStr, this->lastX, this->lastY, SCREENSAVER_TFT_FONT);
 }

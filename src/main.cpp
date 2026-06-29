@@ -260,41 +260,41 @@ void loop() {
 
     //---------------------------------------------------------------------------------------------------
 
-#define SENSOR_DISPLAY_INTERVAL_MS (30 * 1000UL)
-    static unsigned long lastDisplayTime = 0;
-    Utils::timeHasPassed(lastDisplayTime, SENSOR_DISPLAY_INTERVAL_MS, []() {
-        DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", c1_sharedSensorData.vBus, c1_sharedSensorData.vSys, c1_sharedSensorData.coreTemperature, c1_sharedSensorData.externalTemperature);
-    });
+    // #define SENSOR_DISPLAY_INTERVAL_MS (30 * 1000UL)
+    //     static unsigned long lastDisplayTime = 0;
+    //     Utils::timeHasPassed(lastDisplayTime, SENSOR_DISPLAY_INTERVAL_MS, []() {
+    //         DEBUG("vBus=%.2f V, vSys=%.2f V, coreT=%.2f °C, extT=%.2f °C\n", c1_sharedSensorData.vBus, c1_sharedSensorData.vSys, c1_sharedSensorData.coreTemperature, c1_sharedSensorData.externalTemperature);
+    //     });
 
-#define GPS_DISPLAY_INTERVAL_MS (10 * 1000UL)
-    static unsigned long lastGpsDisplayTime = 0;
-    Utils::timeHasPassed(lastGpsDisplayTime, GPS_DISPLAY_INTERVAL_MS, []() {
-        // GPS adatok kiírása
-        DEBUG("GPS: satCnt=%d, valid=%d lat=%.6f lng=%.6f alt=%.1fm spd=%.1fkm/h crs=%.1f° sats=%d hdop=%.1f quality=%s mode=%s bootTime=%lus\n",
-              c1_sharedGpsData.satelliteCount,                                  //
-              (int)c1_sharedGpsData.locationValid,                              //
-              c1_sharedGpsData.lat,                                             //
-              c1_sharedGpsData.lng,                                             //
-              c1_sharedGpsData.altitudeM,                                       //
-              c1_sharedGpsData.speedKmph,                                       //
-              c1_sharedGpsData.courseDeg,                                       //
-              (int)c1_sharedGpsData.satelliteCount,                             //
-              c1_sharedGpsData.hdop,                                            //
-              GpsManager::qualityToString(c1_sharedGpsData.fixQuality).c_str(), //
-              GpsManager::modeToString(c1_sharedGpsData.fixMode).c_str(),       //
-              (unsigned long)c1_sharedGpsData.gpsBootTime                       //
-        );                                                                      //
+    // #define GPS_DISPLAY_INTERVAL_MS (10 * 1000UL)
+    //     static unsigned long lastGpsDisplayTime = 0;
+    //     Utils::timeHasPassed(lastGpsDisplayTime, GPS_DISPLAY_INTERVAL_MS, []() {
+    //         // GPS adatok kiírása
+    //         DEBUG("GPS: satCnt=%d, valid=%d lat=%.6f lng=%.6f alt=%.1fm spd=%.1fkm/h crs=%.1f° sats=%d hdop=%.1f quality=%s mode=%s bootTime=%lus\n",
+    //               c1_sharedGpsData.satelliteCount,                                  //
+    //               (int)c1_sharedGpsData.locationValid,                              //
+    //               c1_sharedGpsData.lat,                                             //
+    //               c1_sharedGpsData.lng,                                             //
+    //               c1_sharedGpsData.altitudeM,                                       //
+    //               c1_sharedGpsData.speedKmph,                                       //
+    //               c1_sharedGpsData.courseDeg,                                       //
+    //               (int)c1_sharedGpsData.satelliteCount,                             //
+    //               c1_sharedGpsData.hdop,                                            //
+    //               GpsManager::qualityToString(c1_sharedGpsData.fixQuality).c_str(), //
+    //               GpsManager::modeToString(c1_sharedGpsData.fixMode).c_str(),       //
+    //               (unsigned long)c1_sharedGpsData.gpsBootTime                       //
+    //         );                                                                      //
 
-        // Ha van érvényes GPS idő és dátum, akkor kiírjuk
-        if (c1_sharedGpsData.timeValid && c1_sharedGpsData.dateValid) {
-            DEBUG("GPS time: %04d-%02d-%02d %02d:%02d:%02d (local)\n",
-                  (int)c1_sharedGpsData.year,   //
-                  (int)c1_sharedGpsData.month,  //
-                  (int)c1_sharedGpsData.day,    //
-                  (int)c1_sharedGpsData.hour,   //
-                  (int)c1_sharedGpsData.minute, //
-                  (int)c1_sharedGpsData.second  //
-            );
-        }
-    });
+    //         // Ha van érvényes GPS idő és dátum, akkor kiírjuk
+    //         if (c1_sharedGpsData.timeValid && c1_sharedGpsData.dateValid) {
+    //             DEBUG("GPS time: %04d-%02d-%02d %02d:%02d:%02d (local)\n",
+    //                   (int)c1_sharedGpsData.year,   //
+    //                   (int)c1_sharedGpsData.month,  //
+    //                   (int)c1_sharedGpsData.day,    //
+    //                   (int)c1_sharedGpsData.hour,   //
+    //                   (int)c1_sharedGpsData.minute, //
+    //                   (int)c1_sharedGpsData.second  //
+    //             );
+    //         }
+    //     });
 }

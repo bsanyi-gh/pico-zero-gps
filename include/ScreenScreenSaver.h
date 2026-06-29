@@ -50,6 +50,13 @@ class ScreenScreenSaver : public UIScreen {
     virtual void drawContent() override;
 
   private:
+    /// Font 8. Large 75 pixel font needs ~3256 bytes in FLASH, only characters 1234567890:-.
+    static constexpr uint8_t SCREENSAVER_TFT_FONT = 7;
+    int32_t textW;
+    int32_t textH;
+
+    int32_t lastX = 0, lastY = 0;
+
     /**
      * @brief UI komponensek létrehozása és elhelyezése
      */

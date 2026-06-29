@@ -62,6 +62,16 @@ void setup1() {
     // Szenzor inicializálása (mutex init is itt történik belül)
     sensorUtils.init();
 
+    // Induláskor várunk egy rövid ablakot, hogy a DS18B20 első konverziója lefusson,
+    // így az első megosztott ext hőmérséklet érték ne legyen késleltetett.
+    {
+        const uint32_t warmupStart = millis();
+        while ((millis() - warmupStart) < 1800UL) {
+            sensorUtils.loop();
+            sleep_ms(10);
+        }
+    }
+
     // Első mérés a változók feltöltésére
     readSensorsOnCore1();
 
