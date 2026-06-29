@@ -47,7 +47,6 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     void onConfigChanged();
 
   private:
-    static constexpr float HUD_MAX_SPEED_KMPH = 180.0f;
     static constexpr uint32_t HUD_UPDATE_INTERVAL_MS = 120;
 
     // Sebesség widget pozíció és méret
@@ -73,8 +72,11 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     static constexpr int16_t SPEED_Y = 52;
     static constexpr int16_t SPEED_W = 212;
     static constexpr int16_t SPEED_H = 118;
+    static constexpr int16_t SPEED_UNIT_BASELINE_Y = SPEED_Y + 96;
+    static constexpr uint8_t SPEED_VALUE_FONT = 7;      // A sebesség értékének betűtípusa (7-es GFXFF font, 7 szegmenses font, csak számok)
+    static constexpr uint8_t SPEED_VALUE_TEXT_SIZE = 2; // A sebesség értékének betűmérete (2-es GFXFF font)
 
-    // Függőleges sensor barok pozíció és méret
+    // Függőleges sensor bar-ok pozíció és méret
     static constexpr int16_t SENSOR_BAR_X = 0;
     static constexpr int16_t SENSOR_BAR_Y = 52;
     static constexpr int16_t SENSOR_BAR_W = 52;
@@ -92,8 +94,13 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
         bool staticPainted = false;
         bool speedSpriteReady = false;
         bool sensorBarSpriteReady = false;
-        float smoothSpeed = 0.0f;
-        float lastDrawnSpeed = -1000.0f;
+        int16_t speedValueX = SPEED_X + 12;
+        int16_t speedValueY = SPEED_Y + 8;
+        int16_t speedValueW = SPEED_W - 24;
+        int16_t speedValueH = 86;
+        float lastSpeedValue = -1000.0f;
+        char lastSpeedText[16] = "";
+        uint16_t lastSpeedColor = 0;
         uint32_t lastRedrawMs = 0;
 
         float lastVoltageValue = -1000.0f;
@@ -135,16 +142,15 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     void drawTraffipaxBaseArea();
 
     static float clampf(float v, float lo, float hi);
-    static uint16_t arcColorForRatio(float ratio);
     static uint16_t meterColorForRatio(float ratio, bool temperatureBar);
 
     void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor);
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
     void drawSensorBarSprite(float value, float minVal, float maxVal, const char *title, const char *unit, bool temperatureBar);
     void ensureSensorBarSpriteReady();
-
-    template <typename Canvas> void drawSpeedArc(Canvas &canvas, float speedKmph, int16_t centerX, int16_t centerY, int16_t rOuter, int16_t rInner);
-    void drawStaticHudBackground();
     void ensureSpeedSpriteReady();
-    void drawSpeedWidget(float speedKmph, bool speedValid);
+    void updateSpeedValueLayoutForFont();
+
+    void drawStaticHudBackground();
+    void drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpdate);
 };

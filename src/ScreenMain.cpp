@@ -101,7 +101,9 @@ void ScreenMain::activate() {
 
     hudState.initialized = false;
     hudState.staticPainted = false;
-    hudState.lastDrawnSpeed = -1000.0f;
+    hudState.lastSpeedValue = -1000.0f;
+    std::strcpy(hudState.lastSpeedText, "");
+    hudState.lastSpeedColor = 0;
     hudState.lastRedrawMs = 0;
     hudState.lastVoltageValue = -1000.0f;
     hudState.lastVoltageMode = !config.data.externalVoltageMode;
@@ -133,26 +135,20 @@ void ScreenMain::handleOwnLoop() {
 
     const float targetSpeed = (c1_sharedGpsData.speedValid) ? c1_sharedGpsData.speedKmph : 0.0f;
 
-    if (!hudState.initialized) {
-        hudState.smoothSpeed = targetSpeed;
-        hudState.initialized = true;
-    } else {
-        hudState.smoothSpeed += (targetSpeed - hudState.smoothSpeed) * 0.24f;
-    }
-
     if (!Utils::timeHasPassed(hudState.lastRedrawMs, HUD_UPDATE_INTERVAL_MS)) {
         return;
     }
 
     hudState.lastRedrawMs = millis();
 
-    const float delta = std::fabs(hudState.smoothSpeed - hudState.lastDrawnSpeed);
-    if (!forceRedraw && delta <= 0.35f && c1_sharedGpsData.speedValid) {
+    const float delta = std::fabs(targetSpeed - hudState.lastSpeedValue);
+    const bool forceUpdate = forceRedraw;
+    if (!forceUpdate && delta <= 0.35f && c1_sharedGpsData.speedValid) {
         return;
     }
 
     forceRedraw = false;
-    hudState.lastDrawnSpeed = hudState.smoothSpeed;
+    hudState.lastSpeedValue = targetSpeed;
 
     const bool speedValid = c1_sharedGpsData.speedValid;
     const bool timeValid = c1_sharedGpsData.timeValid;
@@ -160,7 +156,7 @@ void ScreenMain::handleOwnLoop() {
     const bool voltageMode = config.data.externalVoltageMode;
     const bool temperatureMode = config.data.externalTemperatureMode;
 
-    const float speedKmph = clampf(hudState.smoothSpeed, 0.0f, HUD_MAX_SPEED_KMPH);
+    const float speedKmph = (targetSpeed < 0.0f) ? 0.0f : targetSpeed;
     const float voltageValue = voltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
     const float temperatureValue = temperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
     const uint8_t satelliteCount = c1_sharedGpsData.satelliteCountForUI;
@@ -171,8 +167,8 @@ void ScreenMain::handleOwnLoop() {
     const bool altitudeValid = c1_sharedGpsData.altitudeValid;
     const uint8_t fixQuality = c1_sharedGpsData.fixQuality;
     const uint8_t fixMode = c1_sharedGpsData.fixMode;
-    const bool voltageNeedsUpdate = forceRedraw || voltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
-    const bool temperatureNeedsUpdate = forceRedraw || temperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
+    const bool voltageNeedsUpdate = forceUpdate || voltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
+    const bool temperatureNeedsUpdate = forceUpdate || temperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
     const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
 
     // Műholdak száma
@@ -217,7 +213,7 @@ void ScreenMain::handleOwnLoop() {
     }
 
     // Sebesség widget kirajzolása
-    drawSpeedWidget(speedKmph, speedValid);
+    drawSpeedWidget(speedKmph, speedValid, forceUpdate);
 
     if (anyBarNeedsUpdate) {
         ensureSensorBarSpriteReady();
@@ -355,24 +351,6 @@ float ScreenMain::clampf(float v, float lo, float hi) {
         return hi;
     }
     return v;
-}
-
-/**
- * @brief Sebesség ív színének meghatározása a kitöltési arány alapján
- * @param ratio A kitöltési arány (0.0 - 1.0)
- * @return A kitöltési arányhoz tartozó szín
- */
-uint16_t ScreenMain::arcColorForRatio(float ratio) {
-    if (ratio < 0.55f) {
-        return TFT_CYAN;
-    }
-    if (ratio < 0.80f) {
-        return TFT_GREEN;
-    }
-    if (ratio < 0.93f) {
-        return TFT_ORANGE;
-    }
-    return TFT_RED;
 }
 
 /**
@@ -539,46 +517,6 @@ void ScreenMain::ensureSensorBarSpriteReady() {
 }
 
 /**
- * @brief Sebesség ív kirajzolása a megadott sprite-ra
- * @param canvas A sprite, amire rajzolni kell
- * @param speedKmph Sebesség km/h-ban
- * @param centerX Az ív középpontjának X koordinátája a sprite-on belül
- * @param centerY Az ív középpontjának Y koordinátája a sprite-on belül
- * @param rOuter Külső ív sugara
- * @param rInner Belső ív sugara
- *
- */
-template <typename Canvas> void ScreenMain::drawSpeedArc(Canvas &canvas, float speedKmph, int16_t centerX, int16_t centerY, int16_t rOuter, int16_t rInner) {
-    const float clampedSpeed = clampf(speedKmph, 0.0f, HUD_MAX_SPEED_KMPH);
-    const float fillRatio = clampedSpeed / HUD_MAX_SPEED_KMPH;
-
-    constexpr float startDeg = 205.0f;
-    constexpr float endDeg = 335.0f;
-    constexpr int segments = 52;
-
-    for (int i = 0; i < segments; i++) {
-        const float segmentRatio = static_cast<float>(i) / static_cast<float>(segments - 1);
-        const float deg = startDeg + (endDeg - startDeg) * segmentRatio;
-        const float rad = deg * DEG_TO_RAD;
-
-        const int16_t xOuter = centerX + static_cast<int16_t>(std::cos(rad) * rOuter);
-        const int16_t yOuter = centerY + static_cast<int16_t>(std::sin(rad) * rOuter);
-        const int16_t xInner = centerX + static_cast<int16_t>(std::cos(rad) * rInner);
-        const int16_t yInner = centerY + static_cast<int16_t>(std::sin(rad) * rInner);
-
-        uint16_t color = tft.color565(22, 34, 44);
-        if (segmentRatio <= fillRatio) {
-            color = arcColorForRatio(segmentRatio);
-        }
-
-        canvas.drawLine(xOuter, yOuter, xInner, yInner, color);
-    }
-
-    canvas.drawCircle(centerX, centerY, rOuter + 3, tft.color565(18, 70, 110));
-    canvas.drawCircle(centerX, centerY, rInner - 4, tft.color565(12, 48, 76));
-}
-
-/**
  * @brief Statikus HUD (Head-Up Display) háttér kirajzolása
  * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik, vagy amikor a képernyő teljes újrarajzolása szükséges.
  *
@@ -597,20 +535,70 @@ void ScreenMain::drawStaticHudBackground() {
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "LOCAL", "--:--", TFT_DARKGREY);
     drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "ALT", "-- m", TFT_DARKGREY);
 
+    updateSpeedValueLayoutForFont();
+
+    // Statikus sebesség mértékegység felirat
+    tft.setTextDatum(MC_DATUM);
+    tft.setFreeFont();
+    tft.setTextSize(2);
+    tft.setTextColor(tft.color565(120, 220, 255));
+    const int16_t kmhY = hudState.speedValueY + hudState.speedValueH + 12;
+    tft.drawString("km/h", SPEED_X + (SPEED_W / 2), kmhY <= (SPEED_Y + SPEED_H - 8) ? kmhY : SPEED_UNIT_BASELINE_Y);
+
     tft.fillRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(6, 14, 22));
     tft.drawRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(0, 132, 214));
+}
+
+void ScreenMain::updateSpeedValueLayoutForFont() {
+    constexpr int16_t PAD_X = 10;
+    constexpr int16_t PAD_Y = 8;
+    constexpr int16_t RESERVED_FOR_UNIT = 28;
+    constexpr int16_t MIN_W = 96;
+    constexpr int16_t MIN_H = 54;
+
+    // A sprite tényleges fontbeállításával mérünk, így a méret mindig konzisztens.
+    speedSprite.setTextFont(SPEED_VALUE_FONT);
+    speedSprite.setTextSize(SPEED_VALUE_TEXT_SIZE);
+    int16_t textW = speedSprite.textWidth("888");
+    int16_t textH = speedSprite.fontHeight();
+
+    if (textW <= 0) {
+        textW = MIN_W - (PAD_X * 2);
+    }
+    if (textH <= 0) {
+        textH = MIN_H - (PAD_Y * 2);
+    }
+
+    int16_t desiredW = textW + PAD_X * 2;
+    int16_t desiredH = textH + PAD_Y * 2;
+
+    const int16_t maxH = SPEED_H - RESERVED_FOR_UNIT;
+    desiredW = static_cast<int16_t>(clampf(desiredW, MIN_W, SPEED_W));
+    desiredH = static_cast<int16_t>(clampf(desiredH, MIN_H, maxH));
+
+    hudState.speedValueW = desiredW;
+    hudState.speedValueH = desiredH;
+    hudState.speedValueX = SPEED_X + (SPEED_W - desiredW) / 2;
+    hudState.speedValueY = SPEED_Y + ((maxH - desiredH) / 2);
 }
 
 /**
  * @brief Sebesség widgethez szükséges sprite inicializálása, ha még nem történt meg
  */
 void ScreenMain::ensureSpeedSpriteReady() {
+    updateSpeedValueLayoutForFont();
+
+    if (hudState.speedSpriteReady && (speedSprite.width() != hudState.speedValueW || speedSprite.height() != hudState.speedValueH)) {
+        speedSprite.deleteSprite();
+        hudState.speedSpriteReady = false;
+    }
+
     if (hudState.speedSpriteReady) {
         return;
     }
 
     speedSprite.setColorDepth(8);
-    hudState.speedSpriteReady = speedSprite.createSprite(SPEED_W, SPEED_H) != nullptr;
+    hudState.speedSpriteReady = speedSprite.createSprite(hudState.speedValueW, hudState.speedValueH) != nullptr;
 }
 
 /**
@@ -618,72 +606,74 @@ void ScreenMain::ensureSpeedSpriteReady() {
  * @param speedKmph Sebesség km/h-ban
  * @param speedValid Sebesség érvényessége
  */
-void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid) {
-
-    // A Sprite létrehozása, ha még nem történt meg
-    ensureSpeedSpriteReady();
-
-    // Sebesség widget kirajzolása a sprite-ra, majd a sprite kirajzolása a képernyőre
-    if (hudState.speedSpriteReady) {
-
-        // Háttér kirajzolása a sprite-ra
-        for (int16_t y = 0; y < SPEED_H; y++) {
-            const int16_t globalY = SPEED_Y + y;
-            const uint16_t bg = tft.color565(0, 10 + (globalY * 22) / tft.height(), 18 + (globalY * 34) / tft.height());
-            speedSprite.drawFastHLine(0, y, SPEED_W, bg);
-        }
-
-        // Függőleges vonalak kirajzolása a sprite-ra
-        for (int16_t globalX = 0; globalX < tft.width(); globalX += 20) {
-            const int16_t localX = globalX - SPEED_X;
-            if (localX >= 0 && localX < SPEED_W) {
-                speedSprite.drawFastVLine(localX, 0, SPEED_H, tft.color565(0, 18, 26));
-            }
-        }
-
-        // Sebesség ív kirajzolása
-        drawSpeedArc(speedSprite, speedKmph, 106, 86, 84, 70);
-
-        // Sebesség szöveg kirajzolása
-        speedSprite.setTextDatum(MC_DATUM);
-        speedSprite.setFreeFont(&FreeSansBold24pt7b);
-        speedSprite.setTextSize(1);
-
-        char speedText[8];
-        snprintf(speedText, sizeof(speedText), "%d", static_cast<int>(std::lroundf(speedKmph)));
-        const uint16_t speedColor = speedValid ? TFT_WHITE : TFT_DARKGREY;
-
-        speedSprite.setTextColor(speedColor, TFT_BLACK);
-        speedSprite.drawString(speedText, 106, 64);
-
-        // "KM/H" felirat kirajzolása
-        speedSprite.setFreeFont();
-        speedSprite.setTextSize(2);
-        speedSprite.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
-        speedSprite.drawString("km/h", 106, 110);
-
-        speedSprite.pushSprite(SPEED_X, SPEED_Y);
-        return;
-    }
-
-    // Ha a sprite nem jött létre, akkor a sebesség widgetet közvetlenül a képernyőre rajzoljuk
-    tft.fillRect(SPEED_X, SPEED_Y, SPEED_W, SPEED_H, TFT_BLACK);
-    drawSpeedArc(tft, speedKmph, 160, 138, 84, 70);
-
-    // Sebesség szöveg kirajzolása
-    tft.setTextDatum(MC_DATUM);
-    tft.setFreeFont(&FreeSansBold24pt7b);
-    tft.setTextSize(1);
-    tft.setTextSize(1);
+void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpdate) {
 
     char speedText[8];
     snprintf(speedText, sizeof(speedText), "%d", static_cast<int>(std::lroundf(speedKmph)));
-    tft.setTextColor(speedValid ? TFT_WHITE : TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(speedText, 160, 118);
+    const uint16_t speedColor = speedValid ? TFT_WHITE : TFT_DARKGREY;
 
-    // "KM/H" felirat kirajzolása
-    tft.setFreeFont();
-    tft.setTextSize(2);
-    tft.setTextColor(tft.color565(120, 220, 255), TFT_BLACK);
-    tft.drawString("km/h", 160, 150);
+    // Ha a sebesség szöveg és szín nem változott, és nincs kényszerített frissítés, akkor nem rajzolunk újra
+    if (!forceUpdate && std::strcmp(speedText, hudState.lastSpeedText) == 0 && speedColor == hudState.lastSpeedColor) {
+        return;
+    }
+
+    // Sprite előkészítése a sebesség widgethez
+    ensureSpeedSpriteReady();
+
+    if (hudState.speedSpriteReady) {
+        // Háttér kirajzolása a sebesség szám területére sprite-ra
+        for (int16_t y = 0; y < hudState.speedValueH; y++) {
+            const int16_t globalY = hudState.speedValueY + y;
+            const uint16_t bg = tft.color565(0, 10 + (globalY * 22) / tft.height(), 18 + (globalY * 34) / tft.height());
+            speedSprite.drawFastHLine(0, y, hudState.speedValueW, bg);
+        }
+
+        // Függőleges vonalak kirajzolása sprite-ra
+        for (int16_t globalX = 0; globalX < tft.width(); globalX += 20) {
+            const int16_t localX = globalX - hudState.speedValueX;
+            if (localX >= 0 && localX < hudState.speedValueW) {
+                speedSprite.drawFastVLine(localX, 0, hudState.speedValueH, tft.color565(0, 18, 26));
+            }
+        }
+
+        // Sebesség számérték kirajzolása sprite-ra
+        speedSprite.setTextDatum(MC_DATUM);
+        speedSprite.setTextFont(SPEED_VALUE_FONT);
+        speedSprite.setTextSize(SPEED_VALUE_TEXT_SIZE);
+        speedSprite.setTextColor(speedColor);
+        speedSprite.drawString(speedText, hudState.speedValueW / 2, hudState.speedValueH / 2);
+
+        // Sprite kirajzolása a képernyőre
+        speedSprite.pushSprite(hudState.speedValueX, hudState.speedValueY);
+        std::strncpy(hudState.lastSpeedText, speedText, sizeof(hudState.lastSpeedText) - 1);
+        hudState.lastSpeedText[sizeof(hudState.lastSpeedText) - 1] = '\0';
+        hudState.lastSpeedColor = speedColor;
+        return;
+    }
+
+    // Háttér kirajzolása a sebesség szám területére
+    for (int16_t y = 0; y < hudState.speedValueH; y++) {
+        const int16_t globalY = hudState.speedValueY + y;
+        const uint16_t bg = tft.color565(0, 10 + (globalY * 22) / tft.height(), 18 + (globalY * 34) / tft.height());
+        tft.drawFastHLine(hudState.speedValueX, globalY, hudState.speedValueW, bg);
+    }
+
+    // Függőleges vonalak kirajzolása a sebesség szám területen
+    for (int16_t globalX = 0; globalX < tft.width(); globalX += 20) {
+        if (globalX >= hudState.speedValueX && globalX < hudState.speedValueX + hudState.speedValueW) {
+            tft.drawFastVLine(globalX, hudState.speedValueY, hudState.speedValueH, tft.color565(0, 18, 26));
+        }
+    }
+
+    // Sebesség szöveg kirajzolása
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextFont(SPEED_VALUE_FONT);
+    tft.setTextSize(SPEED_VALUE_TEXT_SIZE);
+
+    tft.setTextColor(speedColor);
+    tft.drawString(speedText, hudState.speedValueX + (hudState.speedValueW / 2), hudState.speedValueY + (hudState.speedValueH / 2));
+
+    std::strncpy(hudState.lastSpeedText, speedText, sizeof(hudState.lastSpeedText) - 1);
+    hudState.lastSpeedText[sizeof(hudState.lastSpeedText) - 1] = '\0';
+    hudState.lastSpeedColor = speedColor;
 }
