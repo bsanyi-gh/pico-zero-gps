@@ -176,7 +176,7 @@ void ScreenMain::handleOwnLoop() {
         const String quality = "Q: " + GpsManager::qualityToString(c1_sharedGpsData.fixQuality);
         const String mode = "M: " + GpsManager::modeToString(c1_sharedGpsData.fixMode);
 
-        drawTrackPanelValue(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, satText, quality.c_str(), mode.c_str(), satColor, satNeedsUpdate, trackMetaNeedsUpdate);
+        drawTrackPanelValue(SAT_X, SAT_Y, SAT_W, SAT_H, satText, quality.c_str(), mode.c_str(), satColor, satNeedsUpdate, trackMetaNeedsUpdate);
 
         if (satNeedsUpdate) {
             std::strncpy(hudState.lastSatText, satText, sizeof(hudState.lastSatText) - 1);
@@ -216,7 +216,7 @@ void ScreenMain::handleOwnLoop() {
     // Magasság panel frissítése csak akkor, ha változott az érték vagy a szín
     const uint16_t altColor = c1_sharedGpsData.altitudeValid ? TFT_CYAN : TFT_DARKGREY;
     if (std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
-        drawAltitudePanelValue(PREC_X, PREC_Y, PREC_W, PREC_H, altText, altColor);
+        drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
         std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
         hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
         hudState.lastAltColor = altColor;
@@ -378,7 +378,7 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
     }
 
     // Sat panel érintésre Satellite képernyőre váltunk.
-    if (event.x >= TRACK_X && event.x < TRACK_X + TRACK_W && event.y >= TRACK_Y && event.y < TRACK_Y + TRACK_H) {
+    if (event.x >= SAT_X && event.x < SAT_X + SAT_W && event.y >= SAT_Y && event.y < SAT_Y + SAT_H) {
         if (getScreenManager()) {
             getScreenManager()->switchToScreen(SCREEN_NAME_SATS);
         }
@@ -442,9 +442,9 @@ void ScreenMain::drawTraffipaxBaseArea() {
     }
 
     // A top HUD elemei, amelyek az alert sáv alatt is látszanak, ha nincs riasztás
-    drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "Sat", "--", TFT_DARKGREY);
+    drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "Local Time", "--:--", TFT_DARKGREY);
-    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "Altitude", "-- m", TFT_DARKGREY);
+    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
 }
 
 /**
@@ -811,9 +811,9 @@ void ScreenMain::drawStaticHudBackground() {
     }
 
     // Alsó információs sor panel
-    drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "Sat", "--", TFT_DARKGREY);
+    drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "Local Time", "--:--", TFT_DARKGREY);
-    drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "Altitude", "-- m", TFT_DARKGREY);
+    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
 
     // Sebesség widget szövegének és méretének frissítése a beállított font alapján
     updateSpeedValueLayoutForFont();

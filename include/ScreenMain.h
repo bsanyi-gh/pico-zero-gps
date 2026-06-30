@@ -60,24 +60,24 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     static constexpr int16_t TOP_PANEL_LEFT_MARGIN = 0;
     static constexpr int16_t TOP_PANEL_RIGHT_MARGIN = 0;
     static constexpr int16_t TOP_PANEL_GAP = 5;
-    static constexpr int16_t TIME_W = 78;
-    static constexpr int16_t PREC_W = 78;
-    int16_t PREC_X = tft.width() - TOP_PANEL_RIGHT_MARGIN - PREC_W;
-    const int16_t TIME_X = PREC_X - TOP_PANEL_GAP - TIME_W;
-    static constexpr int16_t TRACK_X = TOP_PANEL_LEFT_MARGIN;
-    const int16_t TRACK_W = TIME_X - TOP_PANEL_GAP - TRACK_X;
 
     // Sat/Track panel
-    static constexpr int16_t TRACK_Y = TOP_PANEL_Y;
-    static constexpr int16_t TRACK_H = TOP_PANEL_H;
+    static constexpr int16_t SAT_X = TOP_PANEL_LEFT_MARGIN;
+    static constexpr int16_t SAT_Y = TOP_PANEL_Y;
+    const int16_t SAT_W = TIME_X - TOP_PANEL_GAP - SAT_X;
+    static constexpr int16_t SAT_H = TOP_PANEL_H;
 
     // Idő panel
+    const int16_t TIME_X = ALT_X - TOP_PANEL_GAP - TIME_W;
     static constexpr int16_t TIME_Y = 6;
+    static constexpr int16_t TIME_W = 78;
     static constexpr int16_t TIME_H = TOP_PANEL_H;
 
     // ALT panel
-    static constexpr int16_t PREC_Y = 6;
-    static constexpr int16_t PREC_H = TOP_PANEL_H;
+    static constexpr int16_t ALT_W = 78;
+    int16_t ALT_X = tft.width() - TOP_PANEL_RIGHT_MARGIN - ALT_W;
+    static constexpr int16_t ALT_Y = 6;
+    static constexpr int16_t ALT_H = TOP_PANEL_H;
 
     // Sebesség widget pozíció és méret
     static constexpr int16_t SPEED_X = 54;
@@ -192,7 +192,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
      */
     void drawTraffipaxBaseArea();
 
-        // static uint16_t meterColorForRatio(float ratio, bool temperatureBar);
+    // static uint16_t meterColorForRatio(float ratio, bool temperatureBar);
 
     void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor);
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
