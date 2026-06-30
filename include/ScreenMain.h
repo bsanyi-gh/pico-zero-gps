@@ -61,21 +61,21 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     static constexpr int16_t TOP_PANEL_RIGHT_MARGIN = 0;
     static constexpr int16_t TOP_PANEL_GAP = 5;
 
-    // Sat/Track panel
+    // Satellite panel
     static constexpr int16_t SAT_X = TOP_PANEL_LEFT_MARGIN;
     static constexpr int16_t SAT_Y = TOP_PANEL_Y;
-    const int16_t SAT_W = TIME_X - TOP_PANEL_GAP - SAT_X;
+    const int16_t SAT_W = tft.width() - TOP_PANEL_LEFT_MARGIN - TOP_PANEL_RIGHT_MARGIN - DATETIME_W - ALT_W - 2 * TOP_PANEL_GAP; // A SAT panel szélessége a maradék helyet foglalja el a TIME és ALT panelek mellett
     static constexpr int16_t SAT_H = TOP_PANEL_H;
 
-    // Idő panel
-    const int16_t TIME_X = ALT_X - TOP_PANEL_GAP - TIME_W;
-    static constexpr int16_t TIME_Y = 6;
-    static constexpr int16_t TIME_W = 78;
-    static constexpr int16_t TIME_H = TOP_PANEL_H;
+    // Dátum/Idő panel
+    const int16_t DATETIME_X = SAT_X + SAT_W + TOP_PANEL_GAP;
+    static constexpr int16_t DATETIME_Y = 6;
+    static constexpr int16_t DATETIME_W = 110;
+    static constexpr int16_t DATETIME_H = TOP_PANEL_H;
 
-    // ALT panel
-    static constexpr int16_t ALT_W = 78;
-    int16_t ALT_X = tft.width() - TOP_PANEL_RIGHT_MARGIN - ALT_W;
+    // Altitude panel
+    static constexpr int16_t ALT_W = 65;
+    const int16_t ALT_X = DATETIME_X + DATETIME_W + TOP_PANEL_GAP;
     static constexpr int16_t ALT_Y = 6;
     static constexpr int16_t ALT_H = TOP_PANEL_H;
 
@@ -146,8 +146,8 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
         char lastTrackMetaText[64] = "";
         uint16_t lastSatColor = 0;
 
-        char lastTimeText[24] = "";
-        uint16_t lastTimeColor = 0;
+        char lastDateTimeText[24] = "";
+        uint16_t lastDateTimeColor = 0;
 
         char lastAltText[24] = "";
         uint16_t lastAltColor = 0;

@@ -26,8 +26,9 @@ const Config_t DEFAULT_CONFIG = {
     .debugGpsSatellitesDatabase = false,
 
     //--- Nem állítható de perszisztens adatok ->  MainScreen
-    .externalTemperatureMode = true, // Hőmérsékleti mód: true = külső hőmérséklet, false = CPU hőmérséklet, true = external, false = CPU
-    .externalVoltageMode = true,     // Feszültségmérő mód: true = VBus, false = VSys, true = external, false = CPU
+    .dateTimeModeDate = false,       // Dátum/Idő mód: true = dátum, false = idő kijelzés
+    .externalTemperatureMode = true, // Hőmérsékleti mód: true = külső hőmérséklet, false = CPU hőmérséklet,
+    .externalVoltageMode = true,     // Feszültségmérő mód: true = VBus, false = VSys
 };
 
 // Globális konfiguráció példány

@@ -25,6 +25,7 @@ struct Config_t {
     bool debugGpsSatellitesDatabase;      //  GPS műhold adatbázis debug logolása
 
     //--- Nem állítható de perszisztens adatok ->  MainScreen
+    bool dateTimeModeDate = false;       // Dátum/Idő mód: true = dátum, false = idő kijelzés
     bool externalTemperatureMode = true; // Hőmérsékleti mód: true = külső hőmérséklet, false = CPU hőmérséklet, true = external, false = CPU
     bool externalVoltageMode = true;     // Feszültségmérő mód: true = VBus, false = VSys, true = external, false = CPU
 };

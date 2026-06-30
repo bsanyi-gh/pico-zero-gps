@@ -111,11 +111,11 @@ void ScreenMain::activate() {
     hudState.lastTemperatureMode = !config.data.externalTemperatureMode;
     std::strcpy(hudState.lastSatText, "");
     std::strcpy(hudState.lastTrackMetaText, "");
-    std::strcpy(hudState.lastTimeText, "");
+    std::strcpy(hudState.lastDateTimeText, "");
     std::strcpy(hudState.lastAltText, "");
     std::strcpy(hudState.lastBottomText, "");
     hudState.lastSatColor = 0;
-    hudState.lastTimeColor = 0;
+    hudState.lastDateTimeColor = 0;
     hudState.lastAltColor = 0;
     traffipaxAlertController.reset();
     graphDirty = true;
@@ -190,19 +190,28 @@ void ScreenMain::handleOwnLoop() {
         }
     }
 
-    // Idő
-    char timeText[24];
-    if (c1_sharedGpsData.timeValid) {
-        snprintf(timeText, sizeof(timeText), "%02u:%02u", c1_sharedGpsData.hour, c1_sharedGpsData.minute);
+    // Dátum/Idő
+    char dateTimeText[24];
+    if (config.data.dateTimeModeDate) {
+        if (c1_sharedGpsData.dateValid) {
+            snprintf(dateTimeText, sizeof(dateTimeText), "%04u.%02u.%02u", c1_sharedGpsData.year, c1_sharedGpsData.month, c1_sharedGpsData.day);
+        } else {
+            snprintf(dateTimeText, sizeof(dateTimeText), "----.--.--");
+        }
     } else {
-        snprintf(timeText, sizeof(timeText), "--:--");
+        if (c1_sharedGpsData.timeValid) {
+            snprintf(dateTimeText, sizeof(dateTimeText), "%02u:%02u", c1_sharedGpsData.hour, c1_sharedGpsData.minute);
+        } else {
+            snprintf(dateTimeText, sizeof(dateTimeText), "--:--");
+        }
     }
-    const uint16_t timeColor = c1_sharedGpsData.timeValid ? TFT_CYAN : TFT_DARKGREY;
-    if (std::strcmp(timeText, hudState.lastTimeText) != 0 || timeColor != hudState.lastTimeColor) {
-        drawHudPanelValue(TIME_X, TIME_Y, TIME_W, TIME_H, timeText, timeColor);
-        std::strncpy(hudState.lastTimeText, timeText, sizeof(hudState.lastTimeText) - 1);
-        hudState.lastTimeText[sizeof(hudState.lastTimeText) - 1] = '\0';
-        hudState.lastTimeColor = timeColor;
+    const uint16_t dateTimeColor = config.data.dateTimeModeDate ? (c1_sharedGpsData.dateValid ? TFT_CYAN : TFT_DARKGREY) : (c1_sharedGpsData.timeValid ? TFT_CYAN : TFT_DARKGREY);
+    if (std::strcmp(dateTimeText, hudState.lastDateTimeText) != 0 || dateTimeColor != hudState.lastDateTimeColor) {
+        drawHudPanelValue(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, dateTimeText, dateTimeColor);
+
+        std::strncpy(hudState.lastDateTimeText, dateTimeText, sizeof(hudState.lastDateTimeText) - 1);
+        hudState.lastDateTimeText[sizeof(hudState.lastDateTimeText) - 1] = '\0';
+        hudState.lastDateTimeColor = dateTimeColor;
     }
 
     // Jobb felső panel: magasság
@@ -388,6 +397,19 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
         return true;
     }
 
+    // Dátum/Idő panel érintésre módosítjuk a kijelzett értéket.
+    if (event.x >= DATETIME_X && event.x < DATETIME_X + DATETIME_W && event.y >= DATETIME_Y && event.y < DATETIME_Y + DATETIME_H) {
+        config.data.dateTimeModeDate = !config.data.dateTimeModeDate;
+        config.checkSave(); // A módosítás mentése a flash-be
+        // A DateTime panel újrarajzolása a következő ciklusban
+        drawHudPanel(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, config.data.dateTimeModeDate ? "Date" : "Time", config.data.dateTimeModeDate ? "--.--.--" : "--:--", TFT_DARKGREY);
+        hudState.lastRedrawMs = 0; // A következő ciklusban kényszerítjük az újrarajzolást
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
     // Bal oldali függőleges bar: feszültségmérés mód váltás
     if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y_TOP && event.y < SENSOR_BAR_Y_BOTTOM) {
         config.data.externalVoltageMode = !config.data.externalVoltageMode;
@@ -443,7 +465,7 @@ void ScreenMain::drawTraffipaxBaseArea() {
 
     // A top HUD elemei, amelyek az alert sáv alatt is látszanak, ha nincs riasztás
     drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
-    drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "Local Time", "--:--", TFT_DARKGREY);
+    drawHudPanel(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, config.data.dateTimeModeDate ? "Date" : "Time", config.data.dateTimeModeDate ? "--.--.--" : "--:--", TFT_DARKGREY);
     drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
 }
 
@@ -606,8 +628,17 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
         return;
     }
 
-    const uint16_t gridColor = graphSprite.color565(0, 18, 26);
-    const uint16_t baselineColor = graphSprite.color565(0, 70, 104);
+    // Grafikon háttér színének beállítása és kitöltése
+    const uint16_t bg = graphSprite.color565(28, 30, 32);
+    graphSprite.fillSprite(bg);
+
+    // Grafikon rácsvonalak színei
+    const uint16_t gridColor = graphSprite.color565(70, 70, 70);
+    // Grafikon alapvonal színe
+    const uint16_t baselineColor = graphSprite.color565(120, 120, 120);
+    // const uint16_t gridColor = graphSprite.color565(0, 18, 26);
+    // const uint16_t baselineColor = graphSprite.color565(0, 70, 104);
+
     const uint16_t titleColor = graphSprite.color565(150, 210, 240);
     const uint16_t mutedTextColor = graphSprite.color565(90, 130, 160);
 
@@ -694,17 +725,46 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
         const int16_t x = startX + static_cast<int16_t>(i);
         const int16_t y = chartBottom - static_cast<int16_t>((static_cast<int32_t>(sample) * chartHeight) / scaleMax);
 
-        if (prevX >= 0) {
+        // Kitöltés színe a görbe alatt, a grafikon módjától függően
+        const uint16_t fillColor = (graphMode == GraphMode::Speed) ? graphSprite.color565(120, 90, 20) : graphSprite.color565(20, 90, 120);
+        //
+        if (prevX >= 0) { // Ha van előző pont, akkor a kitöltést és a görbét is rajzoljuk
+
+            // Kitöltés a görbe alatt
+            graphSprite.drawLine(prevX, chartBottom, prevX, prevY, fillColor);
+            graphSprite.drawLine(x, chartBottom, x, y, fillColor);
+
+            // Görbe
             graphSprite.drawLine(prevX, prevY, x, y, plotColor);
+
+            // Ha a görbe pixelben van, akkor a következő pixel sorban is rajzolunk egy vonalat, hogy vastagabb legyen a görbe
             if (y + 1 < GRAPH_H) {
                 graphSprite.drawLine(prevX, prevY + 1, x, y + 1, plotColor);
             }
-        } else {
+
+        } else { // Ha nincs előző pont, akkor csak a kitöltést rajzoljuk
+
+            // Kitöltés a görbe alatt
+            graphSprite.drawLine(x, chartBottom, x, y, fillColor);
+            // Ha a görbe pixelben van, akkor a következő pixel sorban is rajzolunk egy vonalat, hogy vastagabb legyen a görbe
             graphSprite.drawPixel(x, y, plotColor);
+
             if (y + 1 < GRAPH_H) {
                 graphSprite.drawPixel(x, y + 1, plotColor);
             }
         }
+
+        // if (prevX >= 0) { // Ha van előző pont, akkor a kitöltést és a görbét is rajzoljuk
+        //     graphSprite.drawLine(prevX, prevY, x, y, plotColor);
+        //     if (y + 1 < GRAPH_H) {
+        //         graphSprite.drawLine(prevX, prevY + 1, x, y + 1, plotColor);
+        //     }
+        // } else {                                    // Ha nincs előző pont, akkor csak a kitöltést rajzoljuk
+        //     graphSprite.drawPixel(x, y, plotColor); //
+        //     if (y + 1 < GRAPH_H) {
+        //         graphSprite.drawPixel(x, y + 1, plotColor);
+        //     }
+        // }
 
         prevX = x;
         prevY = y;
@@ -812,7 +872,7 @@ void ScreenMain::drawStaticHudBackground() {
 
     // Alsó információs sor panel
     drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
-    drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "Local Time", "--:--", TFT_DARKGREY);
+    drawHudPanel(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, config.data.dateTimeModeDate ? "Date" : "Time", config.data.dateTimeModeDate ? "--.--.--" : "--:--", TFT_DARKGREY);
     drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
 
     // Sebesség widget szövegének és méretének frissítése a beállított font alapján
@@ -934,11 +994,27 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpd
         speedSprite.setTextDatum(MC_DATUM);
         speedSprite.setTextFont(SPEED_VALUE_FONT);
         speedSprite.setTextSize(SPEED_VALUE_TEXT_SIZE);
+
+        // speedSprite.setTextColor(speedColor);
+        // speedSprite.drawString(speedText, hudState.speedValueW / 2, hudState.speedValueH / 2);
+        const uint16_t glowColor = speedSprite.color565(0, 120, 180);
+        const int16_t cx = hudState.speedValueW / 2;
+        const int16_t cy = hudState.speedValueH / 2;
+
+        const int8_t offsets[][2] = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}};
+        speedSprite.setTextColor(glowColor);
+
+        for (auto &o : offsets) {
+            speedSprite.drawString(speedText, cx + o[0], cy + o[1]);
+        }
+
         speedSprite.setTextColor(speedColor);
-        speedSprite.drawString(speedText, hudState.speedValueW / 2, hudState.speedValueH / 2);
+        speedSprite.drawString(speedText, cx, cy);
 
         // Sprite kirajzolása a képernyőre
         speedSprite.pushSprite(hudState.speedValueX, hudState.speedValueY);
+
+        // A legutóbbi sebesség szöveg és szín frissítése
         std::strncpy(hudState.lastSpeedText, speedText, sizeof(hudState.lastSpeedText) - 1);
         hudState.lastSpeedText[sizeof(hudState.lastSpeedText) - 1] = '\0';
         hudState.lastSpeedColor = speedColor;
