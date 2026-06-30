@@ -485,7 +485,9 @@ void ScreenMain::drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const 
     const uint16_t panelBg = tft.color565(8, 16, 26);
     const uint16_t panelBorder = tft.color565(0, 160, 255);
 
+    // Panel háttér kirajzolása lekerekített sarkokkal
     tft.fillRoundRect(x, y, w, h, 6, panelBg);
+    // A keret legyen a panel szélén, ezért a fillRoundRect után rajzoljuk ki.
     tft.drawRoundRect(x, y, w, h, 6, panelBorder);
 
     tft.setFreeFont();
@@ -537,7 +539,7 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
     // A törlés legyen beljebb, hogy biztosan ne érintse a keretet/lekerekített sarkot.
     const int16_t valueAreaX = x + 4;
     const int16_t valueAreaY = y + 18;
-    const int16_t valueAreaW = w - 10;
+    const int16_t valueAreaW = w - 15;
     const int16_t valueAreaH = h - 24;
 
     // A korábbi panel érték törlése
