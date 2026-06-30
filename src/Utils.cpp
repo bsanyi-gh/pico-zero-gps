@@ -6,11 +6,8 @@
 namespace Utils {
 
 /**
- * @brief TFT háttérvilágítás beállítása DC/PWM módban
- *
- * 255-ös értéknél ténylegesen DC-t ad ki (digitalWrite HIGH),
- * más értékeknél PWM-et használ (analogWrite)
- * @param brightness Fényerő érték (0-255)
+ * @brief Váraqkozás a soros port megnyitására
+ * Debug módban leblokkolja a programot, amíg a soros port készen nem áll
  */
 void debugWaitForSerial(TFT_eSPI &tft) {
 #ifdef __DEBUG
