@@ -1,9 +1,11 @@
-#include "TraffipaxAlertController.h"
-
 #include <cmath>
 
+#include "TraffipaxAlertController.h"
 #include "pins.h"
 
+/**
+ * @brief Siren leállítása
+ */
 void TraffipaxAlertController::stopSiren() {
     noTone(PIN_BUZZER);
     sirenState.active = false;
@@ -11,6 +13,11 @@ void TraffipaxAlertController::stopSiren() {
     sirenState.nextStepTime = 0;
 }
 
+/**
+ * @brief Siren elindítása
+ * @param currentTime Az aktuális idő millis() formátumban
+ * @param beeperEnabled true, ha a beeper engedélyezve van, false ha nem
+ */
 void TraffipaxAlertController::startSiren(unsigned long currentTime, bool beeperEnabled) {
     if (!beeperEnabled) {
         return;
@@ -22,6 +29,10 @@ void TraffipaxAlertController::startSiren(unsigned long currentTime, bool beeper
     tone(PIN_BUZZER, 600);
 }
 
+/**
+ * @brief Siren frissítése, a következő lépéshez szükséges idő ellenőrzése
+ * @param currentTime Az aktuális idő millis() formátumban
+ */
 void TraffipaxAlertController::updateSiren(unsigned long currentTime) {
     if (!sirenState.active) {
         return;
@@ -41,6 +52,14 @@ void TraffipaxAlertController::updateSiren(unsigned long currentTime) {
     }
 }
 
+/**
+ * @brief Trafipax riasztás kirajzolása a kijelzőre
+ * @param tft A TFT kijelző objektum
+ * @param traffipax A legközelebbi trafipax rekordja
+ * @param distance A trafipax távolsága méterben
+ * @param state A riasztás állapota
+ *
+ */
 void TraffipaxAlertController::drawAlert(TFT_eSPI &tft, const TraffipaxManager::TraffipaxRecord *traffipax, double distance, AlertState state) {
     if (traffipax == nullptr) {
         return;
@@ -74,6 +93,15 @@ void TraffipaxAlertController::drawAlert(TFT_eSPI &tft, const TraffipaxManager::
     tft.setFreeFont();
 }
 
+/**
+ * @brief Riasztás állapotának kiszámítása a távolság és az előző állapot alapján
+ * @param currentState Az aktuális riasztás állapota
+ * @param currentDistance Az aktuális távolság a trafipaxhoz
+ * @param lastDistance Az előző távolság a trafipaxhoz
+ * @param alarmDistanceM A riasztási távolság méterben
+ * @return A következő riasztás állapota
+ *
+ */
 TraffipaxAlertController::AlertState TraffipaxAlertController::calculateState(AlertState currentState, double currentDistance, double lastDistance, uint16_t alarmDistanceM) {
     const bool isApproaching = currentDistance < (lastDistance - DISTANCE_EPSILON_M);
     const bool isDeparting = currentDistance > (lastDistance + DISTANCE_EPSILON_M);
@@ -92,12 +120,27 @@ TraffipaxAlertController::AlertState TraffipaxAlertController::calculateState(Al
     return currentState;
 }
 
+/**
+ * @brief Riasztás állapotának visszaállítása az alapértelmezett állapotra
+ */
 void TraffipaxAlertController::reset() {
     stopSiren();
     alertState = AlertRuntimeState{};
     outOfRangeStart = 0;
 }
 
+/**
+ * @brief Riasztás frissítése a jelenlegi GPS koordináták és konfiguráció alapján
+ *
+ * @param currentLat Az aktuális GPS szélességi koordináta
+ * @param currentLon Az aktuális GPS hosszúsági koordináta
+ * @param positionValid true, ha a GPS pozíció érvényes, false ha nem
+ * @param cfg A riasztás konfigurációs pillanatképe
+ * @param currentTime Az aktuális idő millis() formátumban
+ * @param tft A TFT kijelző objektum
+ * @param traffipaxManager A TrafipaxManager objektum a trafipax adatok kezeléséhez
+ * @return UpdateResult struktúra, amely jelzi, hogy szükséges-e a HUD újrarajzolása vagy az alapértelmezett terület visszaállítása
+ */
 TraffipaxAlertController::UpdateResult TraffipaxAlertController::update(double currentLat, double currentLon, bool positionValid, const ConfigSnapshot &cfg, unsigned long currentTime, TFT_eSPI &tft,
                                                                         TraffipaxManager &traffipaxManager) {
     UpdateResult result;

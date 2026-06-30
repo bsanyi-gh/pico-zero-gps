@@ -447,61 +447,6 @@ void ScreenMain::drawTraffipaxBaseArea() {
 }
 
 /**
- * @brief Értékeket a megadott tartományba szorítja
- * @param v A szorítani kívánt érték
- * @param lo A minimum érték
- * @param hi A maximum érték
- * @return A szorított érték
- */
-float ScreenMain::clampf(float v, float lo, float hi) {
-    if (v < lo) {
-        return lo;
-    }
-    if (v > hi) {
-        return hi;
-    }
-    return v;
-}
-
-/**
- * @brief Színezés a függőleges meterhez a kitöltési arány alapján
- *
- * @param ratio A kitöltési arány
- * @param temperatureBar true, ha hőmérséklet meter, false ha feszültség meter
- */
-uint16_t ScreenMain::meterColorForRatio(float ratio, bool temperatureBar) {
-    if (temperatureBar) {
-        if (ratio < 0.25f) {
-            return TFT_CYAN;
-        }
-        if (ratio < 0.50f) {
-            return TFT_GREEN;
-        }
-        if (ratio < 0.75f) {
-            return TFT_YELLOW;
-        }
-        if (ratio < 0.90f) {
-            return TFT_ORANGE;
-        }
-        return TFT_RED;
-    }
-
-    if (ratio < 0.25f) {
-        return TFT_RED;
-    }
-    if (ratio < 0.50f) {
-        return TFT_ORANGE;
-    }
-    if (ratio < 0.75f) {
-        return TFT_YELLOW;
-    }
-    if (ratio < 0.90f) {
-        return TFT_GREENYELLOW;
-    }
-    return TFT_GREEN;
-}
-
-/**
  * @brief HUD (Head-Up Display) panel kirajzolása
  *
  * @param x A panel bal felső sarkának X koordinátája
@@ -554,6 +499,7 @@ void ScreenMain::drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, c
 
 /**
  * @brief Magasság panel érték kirajzolása kis 'm' mértékegységgel
+ *
  * @param x A panel bal felső sarkának X koordinátája
  * @param y A panel bal felső sarkának Y koordinátája
  * @param w A panel szélessége
@@ -592,6 +538,9 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
     tft.setFreeFont();
 }
 
+/**
+ * @brief Ellenőrzi, hogy a trend grafikon sprite létrejött-e, és ha nem, létrehozza azt
+ */
 void ScreenMain::ensureGraphSpriteReady() {
     if (hudState.graphSpriteReady) {
         return;
@@ -841,7 +790,8 @@ void ScreenMain::ensureSensorBarSpriteReady() {
 
 /**
  * @brief Statikus HUD (Head-Up Display) háttér kirajzolása
- * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik, vagy amikor a képernyő teljes újrarajzolása szükséges.
+ * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik,
+ * vagy amikor a képernyő teljes újrarajzolása szükséges.
  *
  */
 void ScreenMain::drawStaticHudBackground() {
@@ -908,8 +858,8 @@ void ScreenMain::updateSpeedValueLayoutForFont() {
     int16_t desiredH = textH + PAD_Y * 2;
 
     const int16_t maxH = SPEED_H - RESERVED_FOR_UNIT;
-    desiredW = static_cast<int16_t>(clampf(desiredW, MIN_W, SPEED_INNER_W));
-    desiredH = static_cast<int16_t>(clampf(desiredH, MIN_H, maxH));
+    desiredW = static_cast<int16_t>(std::clamp(desiredW, MIN_W, SPEED_INNER_W));
+    desiredH = static_cast<int16_t>(std::clamp(desiredH, MIN_H, maxH));
 
     hudState.speedValueW = desiredW;
     hudState.speedValueH = desiredH;

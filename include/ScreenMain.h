@@ -192,8 +192,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
      */
     void drawTraffipaxBaseArea();
 
-    static float clampf(float v, float lo, float hi);
-    static uint16_t meterColorForRatio(float ratio, bool temperatureBar);
+        // static uint16_t meterColorForRatio(float ratio, bool temperatureBar);
 
     void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor);
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
