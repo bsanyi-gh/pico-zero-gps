@@ -9,6 +9,10 @@
 #include "UIScreen.h"
 #include "ValueChangeDialog.h"
 
+/**
+ * @brief A főképernyő osztálya, amely a GPS és szenzor adatok megjelenítéséért felelős.
+ *
+ */
 class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
   public:
@@ -48,6 +52,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
   private:
     static constexpr uint32_t HUD_UPDATE_INTERVAL_MS = 500;
+    static constexpr uint32_t GRAPH_SAMPLE_INTERVAL_MS = 10UL * 1000UL; // 10 másodpercenként veszünk mintát a trend grafikonhoz
 
     // Felső HUD panelek pozíciója és mérete
     static constexpr int16_t TOP_PANEL_Y = 6;
@@ -97,11 +102,31 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     static constexpr int16_t INFO_W = 208;
     static constexpr int16_t INFO_H = 24;
 
+    // Trend grafikon sáv az infosáv fölött
+    static constexpr int16_t GRAPH_X = 0;                   // A grafikon bal széle a képernyő bal széléhez igazodik
+    static constexpr int16_t GRAPH_Y = 174;                 // A grafikon teteje az infosáv fölött kezdődik
+    static constexpr int16_t GRAPH_W = 320;                 // tft.width() -> A grafikon szélessége a teljes képernyő szélességével megegyezik
+    static constexpr int16_t GRAPH_H = 40;                  // A grafikon magassága 50 pixel
+    static constexpr int16_t GRAPH_SAMPLE_INVALID = -32768; // Érvénytelen mintajelzés a grafikon mintákhoz
+
+    /**
+     * @brief A trend grafikon megjelenítési módját meghatározó enum
+     */
+    enum class GraphMode : uint8_t {
+        Off = 0,
+        Speed,
+        Altitude,
+    };
+
+    /**
+     * @brief A HUD állapotát tároló struktúra, amely a főképernyő statikus részeinek kirajzolásához szükséges információkat tartalmazza.
+     */
     struct ScreenMainHudState {
         bool initialized = false;
         bool staticPainted = false;
         bool speedSpriteReady = false;
         bool sensorBarSpriteReady = false;
+        bool graphSpriteReady = false;
         int16_t speedValueX = SPEED_X + 12;
         int16_t speedValueY = SPEED_Y + 8;
         int16_t speedValueW = SPEED_W - 24;
@@ -134,6 +159,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     TFT_eSprite speedSprite;
     // Sprite a vertikális bar-oknak
     TFT_eSprite sensorBarSprite;
+    TFT_eSprite graphSprite;
 
     TraffipaxAlertController traffipaxAlertController;
 
@@ -145,6 +171,14 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     // Bekapcsolás óta mért legnagyobb (kijelzett) sebesség.
     float maxSpeedSinceBoot = 0.0f;
 
+    // Trend grafikon minták és állapot
+    GraphMode graphMode = GraphMode::Off;
+
+    uint16_t graphSampleCount = 0;
+    bool graphDirty = true;
+    int16_t speedGraphSamples[GRAPH_W] = {};    // A sebesség minták a trend grafikonhoz, érvénytelen minták esetén GRAPH_SAMPLE_INVALID érték
+    int16_t altitudeGraphSamples[GRAPH_W] = {}; // A magasság minták a trend grafikonhoz, érvénytelen minták esetén GRAPH_SAMPLE_INVALID érték
+
     // Config callback id a leiratkozáshoz
     size_t configCallbackId;
 
@@ -153,6 +187,9 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
      */
     void layoutComponents();
 
+    /**
+     * @brief A főképernyő statikus részeinek kirajzolása (HUD panelek, sebesség widget, sensor bar-ok, trend grafikon)
+     */
     void drawTraffipaxBaseArea();
 
     static float clampf(float v, float lo, float hi);
@@ -162,8 +199,11 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
     void drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
     void drawTrackPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *satValue, const char *qualityValue, const char *modeValue, uint16_t satColor, bool updateSat, bool updateMeta);
+    void ensureGraphSpriteReady();
     void ensureSensorBarSpriteReady();
     void ensureSpeedSpriteReady();
+    void recordGraphSample(float speedKmph, bool speedValid, float altitudeM, bool altitudeValid, uint32_t nowMs);
+    void drawTrendGraph(bool forceUpdate);
     void updateSpeedValueLayoutForFont();
 
     void drawStaticHudBackground();

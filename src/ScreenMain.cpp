@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -11,7 +12,7 @@ extern TraffipaxManager traffipaxManager;
 /**
  * @brief ScreenMain konstruktor
  */
-ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft), SENSOR_BAR_X_RIGHT(tft.width() - SENSOR_BAR_W) {
+ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensorBarSprite(&tft), graphSprite(&tft), SENSOR_BAR_X_RIGHT(tft.width() - SENSOR_BAR_W) {
 
     DEBUG("ScreenMain: Constructor called\n");
 
@@ -117,6 +118,7 @@ void ScreenMain::activate() {
     hudState.lastTimeColor = 0;
     hudState.lastAltColor = 0;
     traffipaxAlertController.reset();
+    graphDirty = true;
 
     // Beállítjuk a kényszerített újrarajzolás flag-et
     this->forceRedraw = true;
@@ -133,6 +135,7 @@ void ScreenMain::activate() {
  */
 void ScreenMain::handleOwnLoop() {
 
+    // A sebesség értékének lekérése a GPS adatokból
     const float rawTargetSpeed = (c1_sharedGpsData.speedValid) ? c1_sharedGpsData.speedKmph : 0.0f;
     float targetSpeed = (rawTargetSpeed < 0.0f) ? 0.0f : rawTargetSpeed;
 
@@ -156,12 +159,8 @@ void ScreenMain::handleOwnLoop() {
         maxSpeedSinceBoot = speedKmph;
     }
 
-    const float voltageValue = config.data.externalVoltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
-    const float temperatureValue = config.data.externalTemperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
-
-    const bool voltageNeedsUpdate = forceUpdate || config.data.externalVoltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
-    const bool temperatureNeedsUpdate = forceUpdate || config.data.externalTemperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
-    const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
+    // Mintavétel a trend grafikonhoz
+    recordGraphSample(speedKmph, c1_sharedGpsData.speedValid, c1_sharedGpsData.altitudeM, c1_sharedGpsData.altitudeValid, hudState.lastRedrawMs);
 
     // Műholdak száma + fix adatok
     char satText[24];
@@ -213,6 +212,8 @@ void ScreenMain::handleOwnLoop() {
     } else {
         snprintf(altText, sizeof(altText), "--");
     }
+
+    // Magasság panel frissítése csak akkor, ha változott az érték vagy a szín
     const uint16_t altColor = c1_sharedGpsData.altitudeValid ? TFT_CYAN : TFT_DARKGREY;
     if (std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
         drawAltitudePanelValue(PREC_X, PREC_Y, PREC_W, PREC_H, altText, altColor);
@@ -222,7 +223,19 @@ void ScreenMain::handleOwnLoop() {
     }
 
     // Sebesség widget kirajzolása ugyanazzal az 500 ms HUD ciklussal.
-    drawSpeedWidget(speedKmph, c1_sharedGpsData.speedValid, forceUpdate);
+    drawSpeedWidget(targetSpeed, c1_sharedGpsData.speedValid, forceUpdate);
+
+    // Trend grafikon kirajzolása a külön sávba.
+    drawTrendGraph(forceUpdate);
+
+    // Függőleges bar-ok adatai
+    const float voltageValue = config.data.externalVoltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
+    const float temperatureValue = config.data.externalTemperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
+
+    // Ellenőrizzük, hogy szükséges-e a függőleges bar-ok frissítése
+    const bool voltageNeedsUpdate = forceUpdate || config.data.externalVoltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
+    const bool temperatureNeedsUpdate = forceUpdate || config.data.externalTemperatureMode != hudState.lastTemperatureMode || std::fabs(temperatureValue - hudState.lastTemperatureValue) > 0.05f;
+    const bool anyBarNeedsUpdate = voltageNeedsUpdate || temperatureNeedsUpdate;
 
     // Függőleges bar-ok frissítése, ha szükséges
     if (anyBarNeedsUpdate) {
@@ -341,6 +354,28 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
         return UIScreen::handleTouch(event); // Továbbítjuk az ősosztálynak
     }
 
+    // Trend grafikon sáv: Off -> Speed -> Altitude -> Off.
+    if (event.x >= GRAPH_X && event.x < GRAPH_X + GRAPH_W && event.y >= GRAPH_Y && event.y < GRAPH_Y + GRAPH_H) {
+        switch (graphMode) {
+            case GraphMode::Off:
+                graphMode = GraphMode::Speed;
+                break;
+            case GraphMode::Speed:
+                graphMode = GraphMode::Altitude;
+                break;
+            case GraphMode::Altitude:
+                graphMode = GraphMode::Off;
+                break;
+        }
+        graphDirty = true;
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
     // Sat panel érintésre Satellite képernyőre váltunk.
     if (event.x >= TRACK_X && event.x < TRACK_X + TRACK_W && event.y >= TRACK_Y && event.y < TRACK_Y + TRACK_H) {
         if (getScreenManager()) {
@@ -376,7 +411,7 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
         return true;
     }
 
-    // Ha nem volt találat, továbbítjuk az alaposztálynak
+    // Ha nem volt találat, továbbítjuk az ősosztálynak a touch eseményt
     return UIScreen::handleTouch(event);
 }
 
@@ -533,18 +568,20 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
     // A törlés legyen beljebb, hogy biztosan ne érintse a keretet/lekerekített sarkot.
     const int16_t valueAreaX = x + 4;
     const int16_t valueAreaY = y + 18;
-    const int16_t valueAreaW = w - 8;
+    const int16_t valueAreaW = w - 10;
     const int16_t valueAreaH = h - 24;
+
+    // A korábbi panel érték törlése
     tft.fillRect(valueAreaX, valueAreaY, valueAreaW, valueAreaH, panelBg);
 
-    // Nagy számérték
+    // Nagy számérték kirajzolása
     tft.setFreeFont(&FreeSansBold9pt7b);
     tft.setTextDatum(TL_DATUM);
     tft.setTextSize(1);
     tft.setTextColor(valueColor, panelBg);
     tft.drawString(value, x + 6, y + 20);
 
-    // Kisebb mértékegység (m)
+    // Kisebb mértékegység (m) utána
     const int16_t valueW = tft.textWidth(value);
     tft.setFreeFont();
     tft.setTextDatum(TL_DATUM);
@@ -553,6 +590,177 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
     tft.drawString("m", x + 6 + valueW + 4, y + 26);
 
     tft.setFreeFont();
+}
+
+void ScreenMain::ensureGraphSpriteReady() {
+    if (hudState.graphSpriteReady) {
+        return;
+    }
+
+    // graphSprite.setColorDepth(16);
+    hudState.graphSpriteReady = graphSprite.createSprite(GRAPH_W, GRAPH_H) != nullptr;
+}
+
+/**
+ * @brief Trend grafikon minták rögzítése
+ *
+ * @param speedKmph A sebesség km/h-ban
+ * @param speedValid true, ha a sebesség érvényes, false ha nem
+ * @param altitudeM A magasság méterben
+ * @param altitudeValid true, ha a magasság érvényes, false ha nem
+ * @param nowMs Az aktuális idő milliszekundumban
+ *
+ */
+void ScreenMain::recordGraphSample(float speedKmph, bool speedValid, float altitudeM, bool altitudeValid, uint32_t nowMs) {
+
+    static uint32_t graphLastSampleMs = 0;
+    if (graphSampleCount > 0 && !Utils::timeHasPassed(graphLastSampleMs, GRAPH_SAMPLE_INTERVAL_MS)) {
+        return;
+    }
+
+    // Minták rögzítése, ha érvényesek, különben GRAPH_SAMPLE_INVALID érték kerül a minták közé.
+    const int16_t speedSample = speedValid ? static_cast<int16_t>(std::lroundf(speedKmph)) : GRAPH_SAMPLE_INVALID;
+    const int16_t altitudeSample = altitudeValid ? static_cast<int16_t>(std::lroundf(altitudeM)) : GRAPH_SAMPLE_INVALID;
+
+    // Minták tárolása a körkörös bufferben
+    if (graphSampleCount < GRAPH_W) {
+        speedGraphSamples[graphSampleCount] = speedSample;
+        altitudeGraphSamples[graphSampleCount] = altitudeSample;
+        graphSampleCount++;
+    } else {
+        // Körkörös buffer frissítése, ha a buffer megtelt
+        std::memmove(speedGraphSamples, speedGraphSamples + 1, sizeof(speedGraphSamples) - sizeof(speedGraphSamples[0]));
+        std::memmove(altitudeGraphSamples, altitudeGraphSamples + 1, sizeof(altitudeGraphSamples) - sizeof(altitudeGraphSamples[0]));
+        speedGraphSamples[GRAPH_W - 1] = speedSample;
+        altitudeGraphSamples[GRAPH_W - 1] = altitudeSample;
+    }
+
+    graphLastSampleMs = nowMs;
+    graphDirty = true;
+}
+
+/**
+ * @brief Trend grafikon kirajzolása a kijelzőre
+ * @param forceUpdate true, ha kényszeríteni kell az újrarajzolást, false ha csak akkor rajzoljon, ha a grafikon "piszkos" (dirty)
+ */
+void ScreenMain::drawTrendGraph(bool forceUpdate) {
+
+    // Ha nincs kényszerített frissítés és a grafikon nem "piszkos", akkor nem rajzolunk újra
+    if (!forceUpdate && !graphDirty) {
+        return;
+    }
+
+    ensureGraphSpriteReady();
+    if (!hudState.graphSpriteReady) {
+        return;
+    }
+
+    const uint16_t gridColor = graphSprite.color565(0, 18, 26);
+    const uint16_t baselineColor = graphSprite.color565(0, 70, 104);
+    const uint16_t titleColor = graphSprite.color565(150, 210, 240);
+    const uint16_t mutedTextColor = graphSprite.color565(90, 130, 160);
+
+    auto bgColorForGlobalY = [&](int16_t globalY) -> uint16_t { return graphSprite.color565(0, 10 + (globalY * 22) / tft.height(), 18 + (globalY * 34) / tft.height()); };
+
+    // Grafikon háttér kirajzolása
+    for (int16_t localY = 0; localY < GRAPH_H; localY++) {
+        const int16_t globalY = GRAPH_Y + localY;
+        graphSprite.drawFastHLine(0, localY, GRAPH_W, bgColorForGlobalY(globalY));
+    }
+
+    // Függőleges rácsvonalak kirajzolása 20 pixelenként
+    for (int16_t globalX = 0; globalX < GRAPH_W; globalX += 20) {
+        graphSprite.drawFastVLine(globalX, 0, GRAPH_H, gridColor);
+    }
+
+    // Vízszintes rácsvonalak kirajzolása 12 és 26 pixelenként, valamint az alsó alapvonal
+    graphSprite.drawFastHLine(0, 14, GRAPH_W, gridColor);
+    graphSprite.drawFastHLine(0, 26, GRAPH_W, gridColor);
+    graphSprite.drawFastHLine(0, GRAPH_H - 2, GRAPH_W, baselineColor);
+
+    graphSprite.setFreeFont();
+    graphSprite.setTextSize(1);
+    graphSprite.setTextDatum(TL_DATUM);
+
+    if (graphMode == GraphMode::Off) {
+        graphSprite.setTextColor(mutedTextColor, bgColorForGlobalY(GRAPH_Y + 2));
+        graphSprite.drawString("Trend: OFF", 4, 2);
+        graphSprite.drawString("tap to cycle", 4, 20);
+        graphSprite.pushSprite(GRAPH_X, GRAPH_Y);
+        graphDirty = false;
+        return;
+    }
+
+    const int16_t *samples = (graphMode == GraphMode::Speed) ? speedGraphSamples : altitudeGraphSamples;
+    const uint16_t plotColor = (graphMode == GraphMode::Speed) ? graphSprite.color565(255, 220, 60) : graphSprite.color565(80, 230, 255);
+    const char *title = (graphMode == GraphMode::Speed) ? "Speed" : "Altitude";
+
+    int16_t maxValue = 0;
+    for (uint16_t i = 0; i < graphSampleCount; i++) {
+        if (samples[i] != GRAPH_SAMPLE_INVALID && samples[i] > maxValue) {
+            maxValue = samples[i];
+        }
+    }
+
+    graphSprite.setTextColor(titleColor, bgColorForGlobalY(GRAPH_Y + 2));
+    graphSprite.drawString(title, 4, 2);
+
+    graphSprite.setTextDatum(TR_DATUM);
+    char maxText[24];
+    if (graphMode == GraphMode::Speed) {
+        snprintf(maxText, sizeof(maxText), "max %d km/h", maxValue);
+    } else {
+        snprintf(maxText, sizeof(maxText), "max %d m", maxValue);
+    }
+    graphSprite.drawString(maxText, GRAPH_W - 5, 2);
+    graphSprite.setTextDatum(TL_DATUM);
+
+    // Ha nincs érvényes minta, akkor a "collecting samples" üzenet jelenik meg
+    if (graphSampleCount == 0 || maxValue <= 0) {
+        graphSprite.setTextColor(mutedTextColor, bgColorForGlobalY(GRAPH_Y + 16));
+        graphSprite.drawString("collecting " + String(GRAPH_SAMPLE_INTERVAL_MS / 1000) + " secs samples", 4, 20);
+        graphSprite.pushSprite(GRAPH_X, GRAPH_Y);
+        graphDirty = false;
+        return;
+    }
+
+    const int16_t scaleMax = maxValue + std::max<int16_t>(1, maxValue / 10);
+    const int16_t chartTop = 12;
+    const int16_t chartBottom = GRAPH_H - 3;
+    const int16_t chartHeight = chartBottom - chartTop;
+    const int16_t startX = GRAPH_W - graphSampleCount;
+
+    int16_t prevX = -1;
+    int16_t prevY = -1;
+    for (uint16_t i = 0; i < graphSampleCount; i++) {
+        const int16_t sample = samples[i];
+        if (sample == GRAPH_SAMPLE_INVALID) {
+            prevX = -1;
+            prevY = -1;
+            continue;
+        }
+
+        const int16_t x = startX + static_cast<int16_t>(i);
+        const int16_t y = chartBottom - static_cast<int16_t>((static_cast<int32_t>(sample) * chartHeight) / scaleMax);
+
+        if (prevX >= 0) {
+            graphSprite.drawLine(prevX, prevY, x, y, plotColor);
+            if (y + 1 < GRAPH_H) {
+                graphSprite.drawLine(prevX, prevY + 1, x, y + 1, plotColor);
+            }
+        } else {
+            graphSprite.drawPixel(x, y, plotColor);
+            if (y + 1 < GRAPH_H) {
+                graphSprite.drawPixel(x, y + 1, plotColor);
+            }
+        }
+
+        prevX = x;
+        prevY = y;
+    }
+
+    graphSprite.pushSprite(GRAPH_X, GRAPH_Y);
+    graphDirty = false;
 }
 
 /**
@@ -637,19 +845,24 @@ void ScreenMain::ensureSensorBarSpriteReady() {
  *
  */
 void ScreenMain::drawStaticHudBackground() {
+
+    // Háttér színátmenet kirajzolása
     for (int16_t y = 0; y < tft.height(); y++) {
         const uint16_t bg = tft.color565(0, 10 + (y * 22) / tft.height(), 18 + (y * 34) / tft.height());
         tft.drawFastHLine(0, y, tft.width(), bg);
     }
 
+    // Függőleges rácsvonalak kirajzolása 20 pixelenként
     for (int16_t x = 0; x < tft.width(); x += 20) {
         tft.drawFastVLine(x, 0, tft.height(), tft.color565(0, 18, 26));
     }
 
+    // Alsó információs sor panel
     drawHudPanel(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, "Sat", "--", TFT_DARKGREY);
     drawHudPanel(TIME_X, TIME_Y, TIME_W, TIME_H, "Local Time", "--:--", TFT_DARKGREY);
     drawHudPanel(PREC_X, PREC_Y, PREC_W, PREC_H, "Altitude", "-- m", TFT_DARKGREY);
 
+    // Sebesség widget szövegének és méretének frissítése a beállított font alapján
     updateSpeedValueLayoutForFont();
 
     // Statikus sebesség mértékegység felirat
@@ -660,6 +873,7 @@ void ScreenMain::drawStaticHudBackground() {
     const int16_t kmhY = hudState.speedValueY + hudState.speedValueH + 12;
     tft.drawString("km/h", SPEED_X + (SPEED_W / 2), kmhY <= (SPEED_Y + SPEED_H - 8) ? kmhY : SPEED_UNIT_BASELINE_Y);
 
+    // Alsó információs sor háttér kirajzolása
     tft.fillRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(6, 14, 22));
     tft.drawRoundRect(INFO_X, INFO_Y, INFO_W, INFO_H, 6, tft.color565(0, 132, 214));
 }
