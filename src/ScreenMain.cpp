@@ -32,7 +32,7 @@ ScreenMain::ScreenMain() : UIScreen(SCREEN_NAME_MAIN), speedSprite(&tft), sensor
 ScreenMain::~ScreenMain() { config.unregisterCallback(configCallbackId); }
 
 /**
- * UI komponensek elhelyezése
+ * @brief UI komponensek elhelyezése a képernyőn
  */
 void ScreenMain::layoutComponents() {
     constexpr uint16_t MARGIN = 1;
@@ -131,7 +131,7 @@ void ScreenMain::activate() {
 }
 
 /**
- * Kezeli a képernyő saját ciklusát (dinamikus frissítés)
+ * @brief Kezeli a képernyő saját ciklusát (dinamikus frissítés)
  */
 void ScreenMain::handleOwnLoop() {
 
@@ -344,6 +344,7 @@ void ScreenMain::handleOwnLoop() {
 
 /**
  * @brief Touch esemény kezelése - hőmérsékleti mód váltás
+ *
  * @param event A touch esemény, amely tartalmazza a koordinátákat és a lenyomás állapotát.
  * @return true, ha a touch eseményt kezelte a képernyő, false egyébként
  */
@@ -590,6 +591,7 @@ void ScreenMain::recordGraphSample(float speedKmph, bool speedValid, float altit
 
 /**
  * @brief Trend grafikon kirajzolása a kijelzőre
+ *
  * @param forceUpdate true, ha kényszeríteni kell az újrarajzolást, false ha csak akkor rajzoljon, ha a grafikon "piszkos" (dirty)
  */
 void ScreenMain::drawTrendGraph(bool forceUpdate) {
@@ -790,6 +792,7 @@ void ScreenMain::ensureSensorBarSpriteReady() {
 
 /**
  * @brief Statikus HUD (Head-Up Display) háttér kirajzolása
+ *
  * @note Ezt a függvényt csak egyszer kell meghívni, amikor a képernyő először aktiválódik,
  * vagy amikor a képernyő teljes újrarajzolása szükséges.
  *
@@ -830,7 +833,9 @@ void ScreenMain::drawStaticHudBackground() {
 
 /**
  * @brief Sebesség widget szövegének és méretének frissítése a beállított font alapján
- * @note Ezt a függvényt akkor kell meghívni, amikor a sebesség widget szövegének fontja vagy mérete megváltozik, hogy a widget megfelelően illeszkedjen a kijelzőn.
+ *
+ * @note Ezt a függvényt akkor kell meghívni, amikor a sebesség widget szövegének fontja vagy mérete megváltozik,
+ * hogy a widget megfelelően illeszkedjen a kijelzőn.
  */
 void ScreenMain::updateSpeedValueLayoutForFont() {
     constexpr int16_t HORIZONTAL_INSET = 3;
@@ -871,6 +876,8 @@ void ScreenMain::updateSpeedValueLayoutForFont() {
  * @brief Sebesség widgethez szükséges sprite inicializálása, ha még nem történt meg
  */
 void ScreenMain::ensureSpeedSpriteReady() {
+
+    // A sebesség widget szövegének és méretének frissítése a beállított font alapján
     updateSpeedValueLayoutForFont();
 
     if (hudState.speedSpriteReady && (speedSprite.width() != hudState.speedValueW || speedSprite.height() != hudState.speedValueH)) {
@@ -889,6 +896,7 @@ void ScreenMain::ensureSpeedSpriteReady() {
 
 /**
  * @brief Sebesség widget kirajzolása
+ *
  * @param speedKmph Sebesség km/h-ban
  * @param speedValid Sebesség érvényessége
  */

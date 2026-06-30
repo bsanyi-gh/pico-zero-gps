@@ -5,8 +5,14 @@
 
 #include "TraffipaxManager.h"
 
+/**
+ * @brief A Traffipax riasztás vezérléséért felelős osztály
+ */
 class TraffipaxAlertController {
   public:
+    /**
+     * @brief A TraffipaxAlertController riasztás állapotának enumerációja
+     */
     enum class AlertState {
         INACTIVE,
         APPROACHING,
@@ -14,6 +20,9 @@ class TraffipaxAlertController {
         DEPARTING,
     };
 
+    /**
+     * @brief A TraffipaxAlertController konfigurációs pillanatképe
+     */
     struct ConfigSnapshot {
         bool gpsAlarmEnabled = false;
         bool gpsSirenEnabled = false;
@@ -21,6 +30,9 @@ class TraffipaxAlertController {
         uint16_t alarmDistanceM = 0;
     };
 
+    /**
+     * @brief A TraffipaxAlertController frissítése a GPS koordináták és a konfiguráció alapján
+     */
     struct UpdateResult {
         bool baseAreaNeedsRestore = false;
         bool hudNeedsRepaint = false;
@@ -33,6 +45,9 @@ class TraffipaxAlertController {
     UpdateResult update(double currentLat, double currentLon, bool positionValid, const ConfigSnapshot &cfg, unsigned long currentTime, TFT_eSPI &tft, TraffipaxManager &traffipaxManager);
 
   private:
+    /**
+     * @brief A Traffipax riasztás állapotának futásidejű adatai
+     */
     struct AlertRuntimeState {
         AlertState currentState = AlertState::INACTIVE;
         const TraffipaxManager::TraffipaxRecord *activeTraffipax = nullptr;
@@ -41,6 +56,9 @@ class TraffipaxAlertController {
         unsigned long lastSirenTime = 0;
     };
 
+    /**
+     * @brief A Traffipax riasztás sziréna futásidejű adatai
+     */
     struct SirenRuntimeState {
         bool active = false;
         uint8_t step = 0;

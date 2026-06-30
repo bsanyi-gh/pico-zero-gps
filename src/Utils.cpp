@@ -7,6 +7,7 @@ namespace Utils {
 
 /**
  * @brief TFT háttérvilágítás beállítása DC/PWM módban
+ *
  * 255-ös értéknél ténylegesen DC-t ad ki (digitalWrite HIGH),
  * más értékeknél PWM-et használ (analogWrite)
  * @param brightness Fényerő érték (0-255)
@@ -27,6 +28,7 @@ void debugWaitForSerial(TFT_eSPI &tft) {
 
 /**
  * @brief TFT érintőképernyő kalibrálása
+ *
  * @param tft A TFT kijelző példánya
  * @param calData A kalibrációs adatok tömbje (5 elem)
  *
@@ -89,7 +91,7 @@ void setTftBacklight(uint8_t brightness) {
 }
 
 /**
- *  Pitty hangjelzés
+ * @brief Pitty hangjelzés
  */
 void beepTick() {
     // Csak akkor csipogunk, ha a beeper engedélyezve van
@@ -102,7 +104,7 @@ void beepTick() {
 }
 
 /**
- * Hiba jelzés
+ * @brief Hibajelzés
  */
 void beepError() {
     // Csak akkor csipogunk, ha a beeper engedélyezve van
@@ -120,7 +122,7 @@ void beepError() {
 
 /**
  * @brief CRC16 számítás (CCITT algoritmus)
- * Használhatnánk a CRC könyvtárat is, de itt saját implementációt adunk
+ * (Használhatnánk a CRC könyvtárat is, de itt saját implementációt adunk)
  *
  * @param data Adat pointer
  * @param length Adat hossza bájtokban
@@ -139,7 +141,7 @@ uint16_t calcCRC16(const uint8_t *data, size_t length) {
 
 /**
  * @brief ISO-8859-2 ékezetes karakterek cseréje
- * Az ékezetes karaktereket az ASCII megfelelőjére cseréli.
+ *
  * @param text A szöveg, amelyet módosítani kell
  */
 void removeAccents(char *text) {
@@ -209,6 +211,7 @@ void removeAccents(char *text) {
 
 /**
  * @brief Egy lebegőpontos számot formáz char bufferbe, a tizedesjegyek számát paraméterként adva meg.
+ *
  * @param value A lebegőpontos szám értéke
  * @param decimalPlaces A tizedesjegyek száma
  * @param buffer A kimeneti buffer (min. 16 karakter ajánlott)
@@ -222,6 +225,7 @@ char *floatToString(float value, int decimalPlaces, char *buffer, size_t bufferS
 
 /**
  * @brief Átalakít egy másodperc értéket "perc:mp" formátumú szöveggé
+ *
  * @param sec Időérték másodpercben
  * @param buffer A kimeneti buffer (min. 8 karakter)
  * @param bufferSize A buffer mérete

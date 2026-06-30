@@ -15,6 +15,7 @@ void TraffipaxAlertController::stopSiren() {
 
 /**
  * @brief Siren elindítása
+ *
  * @param currentTime Az aktuális idő millis() formátumban
  * @param beeperEnabled true, ha a beeper engedélyezve van, false ha nem
  */
@@ -31,6 +32,7 @@ void TraffipaxAlertController::startSiren(unsigned long currentTime, bool beeper
 
 /**
  * @brief Siren frissítése, a következő lépéshez szükséges idő ellenőrzése
+ *
  * @param currentTime Az aktuális idő millis() formátumban
  */
 void TraffipaxAlertController::updateSiren(unsigned long currentTime) {
@@ -54,6 +56,7 @@ void TraffipaxAlertController::updateSiren(unsigned long currentTime) {
 
 /**
  * @brief Trafipax riasztás kirajzolása a kijelzőre
+ *
  * @param tft A TFT kijelző objektum
  * @param traffipax A legközelebbi trafipax rekordja
  * @param distance A trafipax távolsága méterben
@@ -95,6 +98,7 @@ void TraffipaxAlertController::drawAlert(TFT_eSPI &tft, const TraffipaxManager::
 
 /**
  * @brief Riasztás állapotának kiszámítása a távolság és az előző állapot alapján
+ *
  * @param currentState Az aktuális riasztás állapota
  * @param currentDistance Az aktuális távolság a trafipaxhoz
  * @param lastDistance Az előző távolság a trafipaxhoz
