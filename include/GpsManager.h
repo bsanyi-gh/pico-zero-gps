@@ -105,6 +105,7 @@ struct GpsData {
     // Sebesség
     volatile bool speedValid; // TinyGPSSpeed::isValid()
     volatile float speedKmph; // km/h
+    volatile bool courseValid;
     volatile float courseDeg; // irány (fok)
 
     // Magasság

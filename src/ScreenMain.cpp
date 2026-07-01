@@ -117,7 +117,11 @@ void ScreenMain::activate() {
     hudState.lastSatColor = 0;
     hudState.lastDateTimeColor = 0;
     hudState.lastAltColor = 0;
+    hudState.lastAltPanelCompassMode = false;
+    hudState.lastCompassNorthDeg = -1000.0f;
     speedDisplayMoving = false;
+    compassHasKnownCourse = false;
+    compassLastKnownCourseDeg = 0.0f;
     traffipaxAlertController.reset();
     graphDirty = true;
 
@@ -227,21 +231,52 @@ void ScreenMain::handleOwnLoop() {
         hudState.lastDateTimeColor = dateTimeColor;
     }
 
-    // Jobb felső panel: magasság
-    char altText[24];
-    if (c1_sharedGpsData.altitudeValid) {
-        snprintf(altText, sizeof(altText), "%d", static_cast<int>(std::lroundf(c1_sharedGpsData.altitudeM)));
-    } else {
-        snprintf(altText, sizeof(altText), "--");
-    }
+    // Jobb felső panel: magasság vagy iránytű
+    if (!config.data.altitudeCompassMode) {
+        // Magasság mód: a magasság értékének kirajzolása
+        char altText[24];
+        if (c1_sharedGpsData.altitudeValid) {
+            snprintf(altText, sizeof(altText), "%d", static_cast<int>(std::lroundf(c1_sharedGpsData.altitudeM)));
+        } else {
+            snprintf(altText, sizeof(altText), "--");
+        }
 
-    // Magasság panel frissítése csak akkor, ha változott az érték vagy a szín
-    const uint16_t altColor = c1_sharedGpsData.altitudeValid ? TFT_CYAN : TFT_DARKGREY;
-    if (std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
-        drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
-        std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
-        hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
-        hudState.lastAltColor = altColor;
+        const uint16_t altColor = c1_sharedGpsData.altitudeValid ? TFT_CYAN : TFT_DARKGREY;
+        if (forceUpdate || hudState.lastAltPanelCompassMode || std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
+            drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
+            std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
+            hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
+            hudState.lastAltColor = altColor;
+            hudState.lastAltPanelCompassMode = false;
+        }
+    } else {
+        // Iránytű mód: a haladási irányt mutató nyíl kirajzolása
+        const bool hasValidHeading = c1_sharedGpsData.courseValid;
+        float courseDeg = c1_sharedGpsData.courseDeg;
+        if (!std::isfinite(courseDeg)) {
+            courseDeg = 0.0f;
+        }
+        courseDeg = std::fmod(courseDeg, 360.0f);
+        if (courseDeg < 0.0f) {
+            courseDeg += 360.0f;
+        }
+
+        if (hasValidHeading) {
+            compassHasKnownCourse = true;
+            compassLastKnownCourseDeg = courseDeg;
+        }
+
+        // Északot mutató nyíl a haladási irányhoz képest: 0°=felfelé, 90°=jobbra.
+        const float displayCourseDeg = compassHasKnownCourse ? compassLastKnownCourseDeg : 0.0f;
+        const float northAngleDeg = (displayCourseDeg == 0.0f) ? 0.0f : (360.0f - displayCourseDeg);
+        const uint16_t compassColor = hasValidHeading ? TFT_CYAN : tft.color565(95, 115, 130);
+
+        if (forceUpdate || !hudState.lastAltPanelCompassMode || std::fabs(northAngleDeg - hudState.lastCompassNorthDeg) >= 0.2f || compassColor != hudState.lastAltColor) {
+            drawCompassPanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, northAngleDeg, hasValidHeading, compassColor);
+            hudState.lastCompassNorthDeg = northAngleDeg;
+            hudState.lastAltColor = compassColor;
+            hudState.lastAltPanelCompassMode = true;
+        }
     }
 
     // Sebesség widget kirajzolása ugyanazzal az 500 ms HUD ciklussal.
@@ -423,6 +458,25 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
         return true;
     }
 
+    // Jobb felső panel érintésre váltás: magasság <-> iránytű
+    if (event.x >= ALT_X && event.x < ALT_X + ALT_W && event.y >= ALT_Y && event.y < ALT_Y + ALT_H) {
+        config.data.altitudeCompassMode = !config.data.altitudeCompassMode;
+        config.checkSave(); // A módosítás mentése a flash-be
+
+        drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, config.data.altitudeCompassMode ? "Compass" : "Altitude", config.data.altitudeCompassMode ? "--" : "-- m", TFT_DARKGREY);
+        forceRedraw = true;
+        hudState.lastRedrawMs = 0;
+        hudState.lastAltPanelCompassMode = config.data.altitudeCompassMode;
+        hudState.lastCompassNorthDeg = -1000.0f;
+        compassHasKnownCourse = false;
+        compassLastKnownCourseDeg = 0.0f;
+        std::strcpy(hudState.lastAltText, "");
+        if (config.data.beeperEnabled) {
+            Utils::beepTick();
+        }
+        return true;
+    }
+
     // Bal oldali függőleges bar: feszültségmérés mód váltás
     if (event.x >= SENSOR_BAR_X && event.x < SENSOR_BAR_X + SENSOR_BAR_W && event.y >= SENSOR_BAR_Y_TOP && event.y < SENSOR_BAR_Y_BOTTOM) {
         config.data.externalVoltageMode = !config.data.externalVoltageMode;
@@ -479,7 +533,7 @@ void ScreenMain::drawTraffipaxBaseArea() {
     // A top HUD elemei, amelyek az alert sáv alatt is látszanak, ha nincs riasztás
     drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
     drawHudPanel(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, config.data.dateTimeModeDate ? "Date" : "Time", config.data.dateTimeModeDate ? "--.--.--" : "--:--", TFT_DARKGREY);
-    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
+    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, config.data.altitudeCompassMode ? "Compass" : "Altitude", config.data.altitudeCompassMode ? "--" : "-- m", TFT_DARKGREY);
 }
 
 /**
@@ -574,6 +628,59 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
     tft.drawString("m", x + 6 + valueW + 4, y + 26);
 
     tft.setFreeFont();
+}
+
+/**
+ * @brief Iránytű panel érték kirajzolása északot mutató nyíllal
+ *
+ * @param x A panel bal felső sarkának X koordinátája
+ * @param y A panel bal felső sarkának Y koordinátája
+ * @param w A panel szélessége
+ * @param h A panel magassága
+ * @param northAngleDeg Az északi irány szöge fokban (0°=felfelé)
+ * @param hasValidHeading true, ha érvényes az irányadat
+ * @param valueColor Az iránytű színe
+ */
+void ScreenMain::drawCompassPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, float northAngleDeg, bool hasValidHeading, uint16_t valueColor) {
+    const uint16_t panelBg = tft.color565(8, 16, 26);
+
+    const int16_t valueAreaX = x + 2;
+    const int16_t valueAreaY = y + 17;
+    const int16_t valueAreaW = w - 4;
+    const int16_t valueAreaH = h - 19;
+    tft.fillRect(valueAreaX, valueAreaY, valueAreaW, valueAreaH, panelBg);
+
+    const int16_t cx = valueAreaX + (valueAreaW / 2);
+    const int16_t cy = valueAreaY + (valueAreaH / 2);
+    const int16_t radius = std::max<int16_t>(6, (std::min<int16_t>(valueAreaW, valueAreaH) / 2) - 1);
+
+    const uint16_t arrowColor = valueColor;
+    const float angleRad = northAngleDeg * static_cast<float>(DEG_TO_RAD);
+    const float ux = std::sin(angleRad);
+    const float uy = -std::cos(angleRad);
+    const float px = -uy;
+    const float py = ux;
+
+    const int16_t tipX = cx + static_cast<int16_t>(std::lroundf(ux * (radius - 1)));
+    const int16_t tipY = cy + static_cast<int16_t>(std::lroundf(uy * (radius - 1)));
+    const int16_t tailX = cx - static_cast<int16_t>(std::lroundf(ux * (radius - 4)));
+    const int16_t tailY = cy - static_cast<int16_t>(std::lroundf(uy * (radius - 4)));
+
+    // Középre igazított, vastagabb nyélszár a jobb olvashatóságért.
+    for (int8_t i = -1; i <= 1; i++) {
+        const int16_t ox = static_cast<int16_t>(std::lroundf(px * i));
+        const int16_t oy = static_cast<int16_t>(std::lroundf(py * i));
+        tft.drawLine(tailX + ox, tailY + oy, tipX + ox, tipY + oy, arrowColor);
+    }
+    tft.fillCircle(tipX, tipY, 1, arrowColor);
+
+    const int16_t headBack = std::max<int16_t>(3, radius / 2);
+    const int16_t headHalfWidth = std::max<int16_t>(3, radius / 2);
+    const int16_t leftX = tipX - static_cast<int16_t>(std::lroundf(ux * headBack - px * headHalfWidth));
+    const int16_t leftY = tipY - static_cast<int16_t>(std::lroundf(uy * headBack - py * headHalfWidth));
+    const int16_t rightX = tipX - static_cast<int16_t>(std::lroundf(ux * headBack + px * headHalfWidth));
+    const int16_t rightY = tipY - static_cast<int16_t>(std::lroundf(uy * headBack + py * headHalfWidth));
+    tft.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, arrowColor);
 }
 
 /**
@@ -888,7 +995,7 @@ void ScreenMain::drawStaticHudBackground() {
     // Alsó információs sor panel
     drawHudPanel(SAT_X, SAT_Y, SAT_W, SAT_H, "Sat", "--", TFT_DARKGREY);
     drawHudPanel(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, config.data.dateTimeModeDate ? "Date" : "Time", config.data.dateTimeModeDate ? "--.--.--" : "--:--", TFT_DARKGREY);
-    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, "Altitude", "-- m", TFT_DARKGREY);
+    drawHudPanel(ALT_X, ALT_Y, ALT_W, ALT_H, config.data.altitudeCompassMode ? "Compass" : "Altitude", config.data.altitudeCompassMode ? "--" : "-- m", TFT_DARKGREY);
 
     // Sebesség widget szövegének és méretének frissítése a beállított font alapján
     updateSpeedValueLayoutForFont();

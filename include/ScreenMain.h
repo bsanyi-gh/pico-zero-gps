@@ -153,6 +153,8 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
         char lastAltText[24] = "";
         uint16_t lastAltColor = 0;
+        bool lastAltPanelCompassMode = false;
+        float lastCompassNorthDeg = -1000.0f;
 
         char lastBottomText[128] = "";
     };
@@ -175,6 +177,10 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     // Sebességkijelzés Schmitt-trigger állapota.
     bool speedDisplayMoving = false;
+
+    // Iránytűhöz az utolsó érvényes irányszög cache-elése.
+    bool compassHasKnownCourse = false;
+    float compassLastKnownCourseDeg = 0.0f;
 
     // Trend grafikon minták és állapot
     GraphMode graphMode = GraphMode::Off;
@@ -202,6 +208,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     void drawHudPanel(int16_t x, int16_t y, int16_t w, int16_t h, const char *title, const char *value, uint16_t valueColor);
     void drawHudPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
     void drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *value, uint16_t valueColor);
+    void drawCompassPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, float northAngleDeg, bool hasValidHeading, uint16_t valueColor);
     void drawTrackPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, const char *satValue, const char *qualityValue, const char *modeValue, uint16_t satColor, bool updateSat, bool updateMeta);
     void ensureGraphSpriteReady();
     void ensureSensorBarSpriteReady();

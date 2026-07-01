@@ -29,6 +29,7 @@ const Config_t DEFAULT_CONFIG = {
     .dateTimeModeDate = false,       // Dátum/Idő mód: true = dátum, false = idő kijelzés
     .externalTemperatureMode = true, // Hőmérsékleti mód: true = külső hőmérséklet, false = CPU hőmérséklet,
     .externalVoltageMode = true,     // Feszültségmérő mód: true = VBus, false = VSys
+    .altitudeCompassMode = false,    // Magasság/iránytű mód: true = iránytű, false = magasság
 };
 
 // Globális konfiguráció példány
