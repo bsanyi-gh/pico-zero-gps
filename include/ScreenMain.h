@@ -53,6 +53,8 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
   private:
     static constexpr uint32_t HUD_UPDATE_INTERVAL_MS = 500;
     static constexpr uint32_t GRAPH_SAMPLE_INTERVAL_MS = 10UL * 1000UL; // 10 másodpercenként veszünk mintát a trend grafikonhoz
+    static constexpr float SPEED_DISPLAY_ON_THRESHOLD_KMPH = 5.0f;
+    static constexpr float SPEED_DISPLAY_OFF_THRESHOLD_KMPH = 2.0f;
 
     // Felső HUD panelek pozíciója és mérete
     static constexpr int16_t TOP_PANEL_Y = 6;
@@ -170,6 +172,9 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     // Bekapcsolás óta mért legnagyobb (kijelzett) sebesség.
     float maxSpeedSinceBoot = 0.0f;
+
+    // Sebességkijelzés Schmitt-trigger állapota.
+    bool speedDisplayMoving = false;
 
     // Trend grafikon minták és állapot
     GraphMode graphMode = GraphMode::Off;

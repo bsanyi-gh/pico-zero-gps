@@ -117,6 +117,7 @@ void ScreenMain::activate() {
     hudState.lastSatColor = 0;
     hudState.lastDateTimeColor = 0;
     hudState.lastAltColor = 0;
+    speedDisplayMoving = false;
     traffipaxAlertController.reset();
     graphDirty = true;
 
@@ -136,12 +137,24 @@ void ScreenMain::activate() {
 void ScreenMain::handleOwnLoop() {
 
     // A sebesség értékének lekérése a GPS adatokból
-    const float rawTargetSpeed = (c1_sharedGpsData.speedValid) ? c1_sharedGpsData.speedKmph : 0.0f;
+    const bool speedValid = c1_sharedGpsData.speedValid;
+    const float rawTargetSpeed = speedValid ? c1_sharedGpsData.speedKmph : 0.0f;
     float targetSpeed = (rawTargetSpeed < 0.0f) ? 0.0f : rawTargetSpeed;
 
-    // Álló helyzetben ne billegjen: 0-ról csak 5 km/h felett induljon el a kijelzés.
-    if (c1_sharedGpsData.speedValid && hudState.lastSpeedValue <= 0.01f && targetSpeed < 5.0f) {
+    // Schmitt-trigger hiszterézis a stabil 0->5 km/h átmenethez.
+    if (!speedValid) {
+        speedDisplayMoving = false;
         targetSpeed = 0.0f;
+    } else {
+        if (!speedDisplayMoving && targetSpeed >= SPEED_DISPLAY_ON_THRESHOLD_KMPH) {
+            speedDisplayMoving = true;
+        } else if (speedDisplayMoving && targetSpeed <= SPEED_DISPLAY_OFF_THRESHOLD_KMPH) {
+            speedDisplayMoving = false;
+        }
+
+        if (!speedDisplayMoving) {
+            targetSpeed = 0.0f;
+        }
     }
 
     if (!Utils::timeHasPassed(hudState.lastRedrawMs, HUD_UPDATE_INTERVAL_MS)) {
@@ -155,12 +168,12 @@ void ScreenMain::handleOwnLoop() {
     hudState.lastSpeedValue = targetSpeed;
 
     const float speedKmph = (targetSpeed < 0.0f) ? 0.0f : targetSpeed;
-    if (c1_sharedGpsData.speedValid && speedKmph > maxSpeedSinceBoot) {
+    if (speedValid && speedKmph > maxSpeedSinceBoot) {
         maxSpeedSinceBoot = speedKmph;
     }
 
     // Mintavétel a trend grafikonhoz
-    recordGraphSample(speedKmph, c1_sharedGpsData.speedValid, c1_sharedGpsData.altitudeM, c1_sharedGpsData.altitudeValid, hudState.lastRedrawMs);
+    recordGraphSample(speedKmph, speedValid, c1_sharedGpsData.altitudeM, c1_sharedGpsData.altitudeValid, hudState.lastRedrawMs);
 
     // Műholdak száma + fix adatok
     char satText[24];
@@ -232,7 +245,7 @@ void ScreenMain::handleOwnLoop() {
     }
 
     // Sebesség widget kirajzolása ugyanazzal az 500 ms HUD ciklussal.
-    drawSpeedWidget(targetSpeed, c1_sharedGpsData.speedValid, forceUpdate);
+    drawSpeedWidget(targetSpeed, speedValid, forceUpdate);
 
     // Trend grafikon kirajzolása a külön sávba.
     drawTrendGraph(forceUpdate);
