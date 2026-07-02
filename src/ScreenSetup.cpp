@@ -8,7 +8,7 @@
  */
 void ScreenSetup::layoutComponents() {
 
-    int btnW = 100;
+    int btnW = 130;
     int btnH = 50;
     int buttonXGap = 20;
 
