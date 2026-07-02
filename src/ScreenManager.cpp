@@ -2,10 +2,15 @@
 #include "GpsManager.h"
 
 // Főképernyők
+#include "ScreenDebugSetup.h"
+#include "ScreenGPSSetup.h"
 #include "ScreenInfo.h"
 #include "ScreenMain.h"
 #include "ScreenSats.h"
 #include "ScreenScreenSaver.h"
+#include "ScreenSetup.h"
+#include "ScreenSystemSetup.h"
+#include "ScreenTFTSetup.h"
 
 // Fejlesztői képernyők
 #include "ScreenEmpty.h"
@@ -41,6 +46,13 @@ void ScreenManager::registerDefaultScreenFactories() {
 
     // ScrenSaver képernyő regisztrálása
     registerScreenFactory(SCREEN_NAME_SCREENSAVER, []() { return std::make_shared<ScreenScreenSaver>(); });
+
+    // Setup képernyők regisztrálása
+    registerScreenFactory(SCREEN_NAME_SETUP, []() { return std::make_shared<ScreenSetup>(); });
+    registerScreenFactory(SCREEN_NAME_SYSTEM_SETUP, []() { return std::make_shared<ScreenSystemSetup>(); });
+    registerScreenFactory(SCREEN_NAME_TFT_SETUP, []() { return std::make_shared<ScreenTFTSetup>(); });
+    registerScreenFactory(SCREEN_NAME_GPS_SETUP, []() { return std::make_shared<ScreenGPSSetup>(); });
+    registerScreenFactory(SCREEN_NAME_DEBUG_SETUP, []() { return std::make_shared<ScreenDebugSetup>(); });
 
     // Teszt képernyők regisztrálása
     registerScreenFactory(SCREEN_NAME_TEST, []() { return std::make_shared<ScreenTest>(); });

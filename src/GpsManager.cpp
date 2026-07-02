@@ -96,6 +96,7 @@ void GpsManager::updateSharedData() {
     c1_sharedGpsData.speedValid = gps.speed.isValid() && gps.speed.age() < GPS_DATA_MAX_AGE;
     c1_sharedGpsData.speedKmph = gps.speed.kmph();
     c1_sharedGpsData.courseValid = gps.course.isValid() && gps.course.age() < GPS_DATA_MAX_AGE;
+    c1_sharedGpsData.courseAgeMs = gps.course.age();
     c1_sharedGpsData.courseDeg = gps.course.deg();
     c1_sharedGpsData.altitudeM = gps.altitude.meters();
     c1_sharedGpsData.altitudeValid = gps.altitude.isValid();

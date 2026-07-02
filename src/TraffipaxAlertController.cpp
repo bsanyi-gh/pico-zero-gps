@@ -93,6 +93,7 @@ void TraffipaxAlertController::drawAlert(TFT_eSPI &tft, const TraffipaxManager::
     tft.setTextSize(1);
     tft.setTextPadding(tft.textWidth("8888m"));
     tft.drawString(distanceText, tft.width() - 8, TRAFFI_ALERT_H / 2);
+    tft.setTextPadding(0);
     tft.setFreeFont();
 }
 
