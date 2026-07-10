@@ -183,7 +183,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     float compassLastKnownCourseDeg = 0.0f;
 
     // Trend grafikon minták és állapot
-    GraphMode graphMode = GraphMode::Off;
+    GraphMode trendGraphMode = GraphMode::Speed;
 
     uint16_t graphSampleCount = 0;
     bool graphDirty = true;

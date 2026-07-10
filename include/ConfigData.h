@@ -29,4 +29,6 @@ struct Config_t {
     bool externalTemperatureMode = true; // Hőmérsékleti mód: true = külső hőmérséklet, false = CPU hőmérséklet, true = external, false = CPU
     bool externalVoltageMode = true;     // Feszültségmérő mód: true = VBus, false = VSys, true = external, false = CPU
     bool altitudeCompassMode = false;    // Magasság/iránytű mód: true = iránytű, false = magasság, true = compass, false = altitude
+
+    uint8_t trendGraphMode = 1; // Trend grafikon mód: Speed
 };

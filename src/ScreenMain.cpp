@@ -310,6 +310,8 @@ void ScreenMain::onConfigChanged() {
     //_isExternalVoltageMode = config.data.externalVoltageMode;
     //_isExternalTemperatureMode = config.data.externalTemperatureMode;
 
+    this->trendGraphMode = static_cast<GraphMode>(config.data.trendGraphMode);
+
     forceRedraw = true;
 }
 
@@ -704,17 +706,19 @@ bool ScreenMain::handleTouch(const TouchEvent &event) {
 
     // Trend grafikon sáv: Off -> Speed -> Altitude -> Off.
     if (event.x >= GRAPH_X && event.x < GRAPH_X + GRAPH_W && event.y >= GRAPH_Y && event.y < GRAPH_Y + GRAPH_H) {
-        switch (graphMode) {
+        switch (trendGraphMode) {
             case GraphMode::Off:
-                graphMode = GraphMode::Speed;
+                trendGraphMode = GraphMode::Speed;
                 break;
             case GraphMode::Speed:
-                graphMode = GraphMode::Altitude;
+                trendGraphMode = GraphMode::Altitude;
                 break;
             case GraphMode::Altitude:
-                graphMode = GraphMode::Off;
+                trendGraphMode = GraphMode::Off;
                 break;
         }
+        config.data.trendGraphMode = static_cast<uint8_t>(this->trendGraphMode);
+        config.checkSave(); // A módosítás mentése a flash-be
         graphDirty = true;
         forceRedraw = true;
         hudState.lastRedrawMs = 0;
@@ -1081,7 +1085,7 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
     graphSprite.setTextSize(1);
     graphSprite.setTextDatum(TL_DATUM);
 
-    if (graphMode == GraphMode::Off) {
+    if (this->trendGraphMode == GraphMode::Off) {
         graphSprite.setTextColor(mutedTextColor, bgColorForGlobalY(GRAPH_Y + 2));
         graphSprite.drawString("Trend: OFF", 4, 2);
         graphSprite.drawString("tap to cycle", 4, 20);
@@ -1090,9 +1094,10 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
         return;
     }
 
-    const int16_t *samples = (graphMode == GraphMode::Speed) ? speedGraphSamples : altitudeGraphSamples;
-    const uint16_t plotColor = (graphMode == GraphMode::Speed) ? graphSprite.color565(255, 220, 60) : graphSprite.color565(80, 230, 255);
-    const char *title = (graphMode == GraphMode::Speed) ? "Speed" : "Altitude";
+    // A kirajzolni kívánt minták kiválasztása a grafikon módjától függően
+    const int16_t *samples = (this->trendGraphMode == GraphMode::Speed) ? speedGraphSamples : altitudeGraphSamples;
+    const uint16_t plotColor = (this->trendGraphMode == GraphMode::Speed) ? graphSprite.color565(255, 220, 60) : graphSprite.color565(80, 230, 255);
+    const char *title = (this->trendGraphMode == GraphMode::Speed) ? "Speed" : "Altitude";
 
     int16_t maxValue = 0;
     for (uint16_t i = 0; i < graphSampleCount; i++) {
@@ -1106,7 +1111,7 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
 
     graphSprite.setTextDatum(TR_DATUM);
     char maxText[24];
-    if (graphMode == GraphMode::Speed) {
+    if (this->trendGraphMode == GraphMode::Speed) {
         snprintf(maxText, sizeof(maxText), "max %d km/h", maxValue);
     } else {
         snprintf(maxText, sizeof(maxText), "max %d m", maxValue);
@@ -1143,7 +1148,7 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
         const int16_t y = chartBottom - static_cast<int16_t>((static_cast<int32_t>(sample) * chartHeight) / scaleMax);
 
         // Kitöltés színe a görbe alatt, a grafikon módjától függően
-        const uint16_t fillColor = (graphMode == GraphMode::Speed) ? graphSprite.color565(120, 90, 20) : graphSprite.color565(20, 90, 120);
+        const uint16_t fillColor = (this->trendGraphMode == GraphMode::Speed) ? graphSprite.color565(120, 90, 20) : graphSprite.color565(20, 90, 120);
         //
         if (prevX >= 0) { // Ha van előző pont, akkor a kitöltést és a görbét is rajzoljuk
 
