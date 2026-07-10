@@ -28,6 +28,9 @@ IScreenManager **iScreenManager = (IScreenManager **)&screenManager; // A UIComp
 
 //-------------------------------------------------------------------------
 
+// Közös demó mód flag (Setup kapcsolja, Main használja).
+bool demoMode = false;
+
 /**
  * @brief Splash screen kirajzolása
  */

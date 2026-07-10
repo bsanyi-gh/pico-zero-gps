@@ -36,7 +36,10 @@ class TraffipaxAlertController {
     struct UpdateResult {
         bool baseAreaNeedsRestore = false;
         bool hudNeedsRepaint = false;
+        bool alertActive = false;
     };
+
+    static constexpr int16_t ALERT_DRAW_HEIGHT = 44;
 
     TraffipaxAlertController() = default;
 
@@ -53,6 +56,7 @@ class TraffipaxAlertController {
         const TraffipaxManager::TraffipaxRecord *activeTraffipax = nullptr;
         double currentDistance = 0.0;
         double lastDistance = 999999.0;
+        unsigned long lastStateChangeTime = 0;
         unsigned long lastSirenTime = 0;
     };
 
@@ -66,10 +70,13 @@ class TraffipaxAlertController {
     };
 
     static constexpr int16_t TRAFFI_ALERT_Y = 0;
-    static constexpr int16_t TRAFFI_ALERT_H = 48;
+    static constexpr int16_t TRAFFI_ALERT_H = ALERT_DRAW_HEIGHT;
     static constexpr uint32_t OUT_OF_RANGE_CLEAR_MS = 3000;
+    static constexpr uint32_t STATE_CHANGE_HOLD_MS = 1200;
     static constexpr uint32_t SIREN_INTERVAL_MS = 10000;
     static constexpr double DISTANCE_EPSILON_M = 10.0;
+    static constexpr double SWITCH_TO_DEPART_DELTA_M = 18.0;
+    static constexpr double SWITCH_TO_APPROACH_DELTA_M = 12.0;
 
     AlertRuntimeState alertState;
     SirenRuntimeState sirenState;

@@ -9,6 +9,227 @@
 
 extern TraffipaxManager traffipaxManager;
 
+namespace {
+
+/**
+ * @brief A Traffipax riasztás állapotának futásidejű adatai
+ */
+struct DemoDataSnapshot {
+    uint8_t satCount;
+    uint8_t satCountForUI;
+    uint8_t fixQuality;
+    uint8_t fixMode;
+    bool locationValid;
+    bool speedValid;
+    bool altitudeValid;
+    bool dateValid;
+    bool timeValid;
+    float speedKmph;
+    float altitudeM;
+    float hdop;
+    float courseDeg;
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+};
+
+/**
+ * @brief Demó mód runtime adatok snapshot struktúra
+ * @param nowMs Az aktuális idő milliszekundumban
+ */
+DemoDataSnapshot buildDemoDataSnapshot(uint32_t nowMs) {
+    static uint32_t lastSatMs = 0;
+    static uint32_t lastAltMs = 0;
+    static uint32_t lastSpeedMs = 0;
+    static uint8_t demoSatCount = 8;
+    static float demoAltitude = 180.0f;
+    static float demoSpeed = 45.0f;
+    static float demoCourse = 0.0f;
+
+    if (lastSatMs == 0 || (nowMs - lastSatMs) >= 2000UL) {
+        demoSatCount = static_cast<uint8_t>(random(4, 16));
+        lastSatMs = nowMs;
+    }
+
+    if (lastAltMs == 0 || (nowMs - lastAltMs) >= 3000UL) {
+        demoAltitude = static_cast<float>(random(50, 2000));
+        lastAltMs = nowMs;
+    }
+
+    if (lastSpeedMs == 0 || (nowMs - lastSpeedMs) >= 1500UL) {
+        demoSpeed = static_cast<float>(random(0, 350));
+        demoCourse += static_cast<float>(random(18, 42));
+        while (demoCourse >= 360.0f) {
+            demoCourse -= 360.0f;
+        }
+        lastSpeedMs = nowMs;
+    }
+
+    const uint32_t elapsedSec = nowMs / 1000UL;
+    const uint32_t base = 17UL * 3600UL + 42UL * 60UL + 30UL + elapsedSec;
+
+    DemoDataSnapshot demo{};
+    demo.satCount = demoSatCount;
+    demo.satCountForUI = demoSatCount;
+    demo.fixQuality = 1;
+    demo.fixMode = 3;
+    demo.locationValid = true;
+    demo.speedValid = true;
+    demo.altitudeValid = true;
+    demo.dateValid = true;
+    demo.timeValid = true;
+    demo.speedKmph = demoSpeed;
+    demo.altitudeM = demoAltitude;
+    demo.hdop = static_cast<float>(random(80, 450)) / 100.0f;
+    demo.courseDeg = demoCourse;
+    demo.year = 2026;
+    demo.month = 7;
+    demo.day = 2;
+    demo.hour = static_cast<uint8_t>((base / 3600UL) % 24UL);
+    demo.minute = static_cast<uint8_t>((base % 3600UL) / 60UL);
+    demo.second = static_cast<uint8_t>(base % 60UL);
+    return demo;
+}
+
+/**
+ * @brief Runtime adatok snapshot struktúra
+ */
+struct RuntimeDataSnapshot {
+    uint8_t satCount;
+    uint8_t satCountForUI;
+    uint8_t fixQuality;
+    uint8_t fixMode;
+    bool locationValid;
+    bool speedValid;
+    bool altitudeValid;
+    bool dateValid;
+    bool timeValid;
+    float speedKmph;
+    float altitudeM;
+    float hdop;
+    float courseDeg;
+    uint32_t courseAgeMs;
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+    double lat;
+    double lon;
+    float voltageValue;
+    float temperatureValue;
+};
+
+/**
+ * @brief Valós idejű runtime adatok összegyűjtése a RuntimeDataSnapshot struktúrába
+ * @return RuntimeDataSnapshot A valós idejű adatok snapshot-ja
+ *
+ */
+RuntimeDataSnapshot collectLiveRuntimeData() {
+    RuntimeDataSnapshot data{};
+    data.satCount = c1_sharedGpsData.satelliteCount;
+    data.satCountForUI = c1_sharedGpsData.satelliteCountForUI;
+    data.fixQuality = c1_sharedGpsData.fixQuality;
+    data.fixMode = c1_sharedGpsData.fixMode;
+    data.locationValid = c1_sharedGpsData.locationValid;
+    data.speedValid = c1_sharedGpsData.speedValid;
+    data.altitudeValid = c1_sharedGpsData.altitudeValid;
+    data.dateValid = c1_sharedGpsData.dateValid;
+    data.timeValid = c1_sharedGpsData.timeValid;
+    data.speedKmph = c1_sharedGpsData.speedKmph;
+    data.altitudeM = c1_sharedGpsData.altitudeM;
+    data.hdop = c1_sharedGpsData.hdop;
+    data.courseDeg = c1_sharedGpsData.courseDeg;
+    data.courseAgeMs = c1_sharedGpsData.courseAgeMs;
+    data.year = c1_sharedGpsData.year;
+    data.month = c1_sharedGpsData.month;
+    data.day = c1_sharedGpsData.day;
+    data.hour = c1_sharedGpsData.hour;
+    data.minute = c1_sharedGpsData.minute;
+    data.second = c1_sharedGpsData.second;
+    data.lat = c1_sharedGpsData.lat;
+    data.lon = c1_sharedGpsData.lng;
+    data.voltageValue = config.data.externalVoltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
+    data.temperatureValue = config.data.externalTemperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
+    return data;
+}
+
+/**
+ * @brief Demó mód runtime adatok alkalmazása a RuntimeDataSnapshot struktúrára
+ *
+ * @param nowMs Az aktuális idő milliszekundumban
+ * @param data A RuntimeDataSnapshot referencia, amire a demó adatokat alkalmazzuk
+ * @param traffiManager A TraffipaxManager referencia, amivel a demó Traffipax koordinátákat kezeljük
+ * @param alertController A TraffipaxAlertController referencia, amivel a demó Traffipax riasztás állapotát kezeljük
+ *
+ */
+void applyDemoRuntimeData(uint32_t nowMs, RuntimeDataSnapshot &data, TraffipaxManager &traffiManager, TraffipaxAlertController &alertController) {
+    const DemoDataSnapshot demo = buildDemoDataSnapshot(nowMs);
+
+    data.satCount = demo.satCount;
+    data.satCountForUI = demo.satCountForUI;
+    data.fixQuality = demo.fixQuality;
+    data.fixMode = demo.fixMode;
+    data.locationValid = demo.locationValid;
+    data.speedValid = demo.speedValid;
+    data.altitudeValid = demo.altitudeValid;
+    data.dateValid = demo.dateValid;
+    data.timeValid = demo.timeValid;
+    data.speedKmph = demo.speedKmph;
+    data.altitudeM = demo.altitudeM;
+    data.hdop = demo.hdop;
+    data.courseDeg = demo.courseDeg;
+    data.courseAgeMs = 0;
+    data.year = demo.year;
+    data.month = demo.month;
+    data.day = demo.day;
+    data.hour = demo.hour;
+    data.minute = demo.minute;
+    data.second = demo.second;
+
+    if (!traffiManager.isDemoActive()) {
+        traffiManager.startDemo();
+        // Új demo ciklusnál töröljük a korábbi célpont/távolság állapotot.
+        alertController.reset();
+    }
+
+    // Demó módban kizárólag a demo koordinátát használjuk a traffi logikához.
+    data.locationValid = false;
+    data.lat = 0.0;
+    data.lon = 0.0;
+    if (traffiManager.isDemoActive()) {
+        double demoLat = 0.0;
+        double demoLon = 0.0;
+        traffiManager.processDemo();
+        if (traffiManager.getDemoCoords(demoLat, demoLon)) {
+            data.lat = demoLat;
+            data.lon = demoLon;
+            data.locationValid = true;
+        }
+    }
+
+    // Demó szenzor értékek, hogy ne keveredjenek valós Core1 méréssel.
+    static uint32_t lastDemoSensorMs = 0;
+    static float demoVBus = 12.2f;
+    static float demoVsys = 4.1f;
+    static float demoExtTemp = 23.0f;
+    static float demoCpuTemp = 38.0f;
+    if (lastDemoSensorMs == 0 || (nowMs - lastDemoSensorMs) >= 2200UL) {
+        demoVBus = 3.5f + static_cast<float>(random(0, 1201)) / 100.0f;
+        demoVsys = 2.7f + static_cast<float>(random(0, 231)) / 100.0f;
+        demoExtTemp = -15.5f + static_cast<float>(random(0, 811)) / 10.0f;
+        demoCpuTemp = 20.0f + static_cast<float>(random(0, 601)) / 10.0f;
+        lastDemoSensorMs = nowMs;
+    }
+    data.voltageValue = config.data.externalVoltageMode ? demoVBus : demoVsys;
+    data.temperatureValue = config.data.externalTemperatureMode ? demoExtTemp : demoCpuTemp;
+}
+} // namespace
+
 /**
  * @brief ScreenMain konstruktor
  */
@@ -140,9 +361,85 @@ void ScreenMain::activate() {
  */
 void ScreenMain::handleOwnLoop() {
 
+    uint32_t nowMs = millis();
+    static bool lastDemoMode = demoMode;
+
+    RuntimeDataSnapshot data = collectLiveRuntimeData();
+
+    if (lastDemoMode != demoMode) {
+        // Módváltáskor teljes HUD cache reset, hogy ne maradjon régi (demo/valós) tartalom a képernyőn.
+        hudState.staticPainted = false;
+        hudState.lastRedrawMs = 0;
+        std::strcpy(hudState.lastSatText, "");
+        std::strcpy(hudState.lastTrackMetaText, "");
+        std::strcpy(hudState.lastDateTimeText, "");
+        std::strcpy(hudState.lastAltText, "");
+        std::strcpy(hudState.lastBottomText, "");
+        hudState.lastSatColor = 0;
+        hudState.lastDateTimeColor = 0;
+        hudState.lastAltColor = 0;
+        hudState.lastAltPanelCompassMode = false;
+        hudState.lastCompassNorthDeg = -1000.0f;
+        maxSpeedSinceBoot = 0.0f;
+        speedDisplayMoving = false;
+        compassHasKnownCourse = false;
+        compassLastKnownCourseDeg = 0.0f;
+        graphSampleCount = 0;
+        graphDirty = true;
+        traffipaxAlertController.reset();
+        forceRedraw = true;
+        markForRedraw(true);
+
+        if (demoMode) {
+            traffipaxManager.startDemo();
+        }
+
+        lastDemoMode = demoMode;
+    }
+
+    if (demoMode) {
+        applyDemoRuntimeData(nowMs, data, traffipaxManager, traffipaxAlertController);
+    }
+
+    const uint8_t dataSatCount = data.satCount;
+    const uint8_t dataSatCountForUI = data.satCountForUI;
+    const uint8_t dataFixQuality = data.fixQuality;
+    const uint8_t dataFixMode = data.fixMode;
+    const bool dataLocationValid = data.locationValid;
+    const bool dataSpeedValid = data.speedValid;
+    const bool dataAltitudeValid = data.altitudeValid;
+    const bool dataDateValid = data.dateValid;
+    const bool dataTimeValid = data.timeValid;
+    const float dataSpeedKmph = data.speedKmph;
+    const float dataAltitudeM = data.altitudeM;
+    const float dataHdop = data.hdop;
+    const float dataCourseDeg = data.courseDeg;
+    const uint32_t dataCourseAgeMs = data.courseAgeMs;
+    const uint16_t dataYear = data.year;
+    const uint8_t dataMonth = data.month;
+    const uint8_t dataDay = data.day;
+    const uint8_t dataHour = data.hour;
+    const uint8_t dataMinute = data.minute;
+    const double dataLat = data.lat;
+    const double dataLon = data.lon;
+    const float dataVoltageValue = data.voltageValue;
+    const float dataTemperatureValue = data.temperatureValue;
+
+    // Traffipax közeledés / távolodás figyelmeztetés frissítése minden ciklusban.
+    const TraffipaxAlertController::ConfigSnapshot traffiCfg{config.data.gpsTraffiAlarmEnabled, config.data.gpsTraffiSirenAlarmEnabled, config.data.beeperEnabled, config.data.gpsTraffiAlarmDistance};
+    const auto traffiResult = traffipaxAlertController.update(dataLat, dataLon, dataLocationValid, traffiCfg, nowMs, tft, traffipaxManager);
+    if (traffiResult.baseAreaNeedsRestore) {
+        drawTraffipaxBaseArea();
+    }
+    if (traffiResult.hudNeedsRepaint) {
+        hudState.staticPainted = false;
+        hudState.lastRedrawMs = 0;
+        forceRedraw = true;
+    }
+
     // A sebesség értékének lekérése a GPS adatokból
-    const bool speedValid = c1_sharedGpsData.speedValid;
-    const float rawTargetSpeed = speedValid ? c1_sharedGpsData.speedKmph : 0.0f;
+    const bool speedValid = dataSpeedValid;
+    const float rawTargetSpeed = speedValid ? dataSpeedKmph : 0.0f;
     float targetSpeed = (rawTargetSpeed < 0.0f) ? 0.0f : rawTargetSpeed;
 
     // Schmitt-trigger hiszterézis a stabil 0->5 km/h átmenethez.
@@ -165,7 +462,7 @@ void ScreenMain::handleOwnLoop() {
         return;
     }
 
-    hudState.lastRedrawMs = millis();
+    hudState.lastRedrawMs = nowMs;
 
     const bool forceUpdate = forceRedraw;
     forceRedraw = false;
@@ -177,106 +474,108 @@ void ScreenMain::handleOwnLoop() {
     }
 
     // Mintavétel a trend grafikonhoz
-    recordGraphSample(speedKmph, speedValid, c1_sharedGpsData.altitudeM, c1_sharedGpsData.altitudeValid, hudState.lastRedrawMs);
+    recordGraphSample(speedKmph, speedValid, dataAltitudeM, dataAltitudeValid, hudState.lastRedrawMs);
 
-    // Műholdak száma + fix adatok
-    char satText[24];
-    snprintf(satText, sizeof(satText), "%u / %u", c1_sharedGpsData.satelliteCount, c1_sharedGpsData.satelliteCountForUI);
+    if (!traffiResult.alertActive) {
+        // Műholdak száma + fix adatok
+        char satText[24];
+        snprintf(satText, sizeof(satText), "%u / %u", dataSatCount, dataSatCountForUI);
 
-    // Műholdak minősége és fix mód
-    char trackMetaText[64];
-    snprintf(trackMetaText, sizeof(trackMetaText), "Q:%s|M:%s", GpsManager::qualityToString(c1_sharedGpsData.fixQuality).c_str(), GpsManager::modeToString(c1_sharedGpsData.fixMode).c_str());
-    const uint16_t satColor = c1_sharedGpsData.locationValid ? TFT_GREEN : TFT_DARKGREY;
-    const bool satNeedsUpdate = std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor;
-    const bool trackMetaNeedsUpdate = std::strcmp(trackMetaText, hudState.lastTrackMetaText) != 0;
-    if (satNeedsUpdate || trackMetaNeedsUpdate) {
-        const String quality = "Q: " + GpsManager::qualityToString(c1_sharedGpsData.fixQuality);
-        const String mode = "M: " + GpsManager::modeToString(c1_sharedGpsData.fixMode);
+        // Műholdak minősége és fix mód
+        char trackMetaText[64];
+        snprintf(trackMetaText, sizeof(trackMetaText), "Q:%s|M:%s", GpsManager::qualityToString(dataFixQuality).c_str(), GpsManager::modeToString(dataFixMode).c_str());
+        const uint16_t satColor = dataLocationValid ? TFT_GREEN : TFT_DARKGREY;
+        const bool satNeedsUpdate = std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor;
+        const bool trackMetaNeedsUpdate = std::strcmp(trackMetaText, hudState.lastTrackMetaText) != 0;
+        if (satNeedsUpdate || trackMetaNeedsUpdate) {
+            const String quality = "Q: " + GpsManager::qualityToString(dataFixQuality);
+            const String mode = "M: " + GpsManager::modeToString(dataFixMode);
 
-        drawTrackPanelValue(SAT_X, SAT_Y, SAT_W, SAT_H, satText, quality.c_str(), mode.c_str(), satColor, satNeedsUpdate, trackMetaNeedsUpdate);
+            drawTrackPanelValue(SAT_X, SAT_Y, SAT_W, SAT_H, satText, quality.c_str(), mode.c_str(), satColor, satNeedsUpdate, trackMetaNeedsUpdate);
 
-        if (satNeedsUpdate) {
-            std::strncpy(hudState.lastSatText, satText, sizeof(hudState.lastSatText) - 1);
-            hudState.lastSatText[sizeof(hudState.lastSatText) - 1] = '\0';
-            hudState.lastSatColor = satColor;
+            if (satNeedsUpdate) {
+                std::strncpy(hudState.lastSatText, satText, sizeof(hudState.lastSatText) - 1);
+                hudState.lastSatText[sizeof(hudState.lastSatText) - 1] = '\0';
+                hudState.lastSatColor = satColor;
+            }
+
+            if (trackMetaNeedsUpdate) {
+                std::strncpy(hudState.lastTrackMetaText, trackMetaText, sizeof(hudState.lastTrackMetaText) - 1);
+                hudState.lastTrackMetaText[sizeof(hudState.lastTrackMetaText) - 1] = '\0';
+            }
         }
 
-        if (trackMetaNeedsUpdate) {
-            std::strncpy(hudState.lastTrackMetaText, trackMetaText, sizeof(hudState.lastTrackMetaText) - 1);
-            hudState.lastTrackMetaText[sizeof(hudState.lastTrackMetaText) - 1] = '\0';
-        }
-    }
-
-    // Dátum/Idő
-    char dateTimeText[24];
-    if (config.data.dateTimeModeDate) {
-        if (c1_sharedGpsData.dateValid) {
-            snprintf(dateTimeText, sizeof(dateTimeText), "%04u.%02u.%02u", c1_sharedGpsData.year, c1_sharedGpsData.month, c1_sharedGpsData.day);
+        // Dátum/Idő
+        char dateTimeText[24];
+        if (config.data.dateTimeModeDate) {
+            if (dataDateValid) {
+                snprintf(dateTimeText, sizeof(dateTimeText), "%04u.%02u.%02u", dataYear, dataMonth, dataDay);
+            } else {
+                snprintf(dateTimeText, sizeof(dateTimeText), "----.--.--");
+            }
         } else {
-            snprintf(dateTimeText, sizeof(dateTimeText), "----.--.--");
+            if (dataTimeValid) {
+                snprintf(dateTimeText, sizeof(dateTimeText), "%02u:%02u", dataHour, dataMinute);
+            } else {
+                snprintf(dateTimeText, sizeof(dateTimeText), "--:--");
+            }
         }
-    } else {
-        if (c1_sharedGpsData.timeValid) {
-            snprintf(dateTimeText, sizeof(dateTimeText), "%02u:%02u", c1_sharedGpsData.hour, c1_sharedGpsData.minute);
+        const uint16_t dateTimeColor = config.data.dateTimeModeDate ? (dataDateValid ? TFT_CYAN : TFT_DARKGREY) : (dataTimeValid ? TFT_CYAN : TFT_DARKGREY);
+        if (std::strcmp(dateTimeText, hudState.lastDateTimeText) != 0 || dateTimeColor != hudState.lastDateTimeColor) {
+            drawHudPanelValue(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, dateTimeText, dateTimeColor);
+
+            std::strncpy(hudState.lastDateTimeText, dateTimeText, sizeof(hudState.lastDateTimeText) - 1);
+            hudState.lastDateTimeText[sizeof(hudState.lastDateTimeText) - 1] = '\0';
+            hudState.lastDateTimeColor = dateTimeColor;
+        }
+
+        // Jobb felső panel: magasság vagy iránytű
+        if (!config.data.altitudeCompassMode) {
+            // Magasság mód: a magasság értékének kirajzolása
+            char altText[24];
+            if (dataAltitudeValid) {
+                snprintf(altText, sizeof(altText), "%d", static_cast<int>(std::lroundf(dataAltitudeM)));
+            } else {
+                snprintf(altText, sizeof(altText), "--");
+            }
+
+            const uint16_t altColor = dataAltitudeValid ? TFT_CYAN : TFT_DARKGREY;
+            if (forceUpdate || hudState.lastAltPanelCompassMode || std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
+                drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
+                std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
+                hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
+                hudState.lastAltColor = altColor;
+                hudState.lastAltPanelCompassMode = false;
+            }
         } else {
-            snprintf(dateTimeText, sizeof(dateTimeText), "--:--");
-        }
-    }
-    const uint16_t dateTimeColor = config.data.dateTimeModeDate ? (c1_sharedGpsData.dateValid ? TFT_CYAN : TFT_DARKGREY) : (c1_sharedGpsData.timeValid ? TFT_CYAN : TFT_DARKGREY);
-    if (std::strcmp(dateTimeText, hudState.lastDateTimeText) != 0 || dateTimeColor != hudState.lastDateTimeColor) {
-        drawHudPanelValue(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, dateTimeText, dateTimeColor);
+            // Iránytű mód: a haladási irányt mutató nyíl kirajzolása
+            const bool hasFreshCourse = (dataCourseAgeMs < GPS_DATA_MAX_AGE);
+            float courseDeg = dataCourseDeg;
+            if (!std::isfinite(courseDeg)) {
+                courseDeg = 0.0f;
+            }
+            courseDeg = std::fmod(courseDeg, 360.0f);
+            if (courseDeg < 0.0f) {
+                courseDeg += 360.0f;
+            }
 
-        std::strncpy(hudState.lastDateTimeText, dateTimeText, sizeof(hudState.lastDateTimeText) - 1);
-        hudState.lastDateTimeText[sizeof(hudState.lastDateTimeText) - 1] = '\0';
-        hudState.lastDateTimeColor = dateTimeColor;
-    }
+            const bool hasUsableCourse = dataLocationValid && dataSpeedValid && (courseDeg >= 0.0f) && (courseDeg <= 360.0f);
+            if (hasUsableCourse) {
+                compassHasKnownCourse = true;
+                compassLastKnownCourseDeg = courseDeg;
+            }
 
-    // Jobb felső panel: magasság vagy iránytű
-    if (!config.data.altitudeCompassMode) {
-        // Magasság mód: a magasság értékének kirajzolása
-        char altText[24];
-        if (c1_sharedGpsData.altitudeValid) {
-            snprintf(altText, sizeof(altText), "%d", static_cast<int>(std::lroundf(c1_sharedGpsData.altitudeM)));
-        } else {
-            snprintf(altText, sizeof(altText), "--");
-        }
+            // Északot mutató nyíl a haladási irányhoz képest: 0°=felfelé, 90°=jobbra.
+            const float displayCourseDeg = compassHasKnownCourse ? compassLastKnownCourseDeg : 0.0f;
+            const float northAngleDeg = (displayCourseDeg == 0.0f) ? 0.0f : (360.0f - displayCourseDeg);
+            const uint16_t compassColor = (hasFreshCourse && hasUsableCourse) ? TFT_CYAN : tft.color565(95, 115, 130);
 
-        const uint16_t altColor = c1_sharedGpsData.altitudeValid ? TFT_CYAN : TFT_DARKGREY;
-        if (forceUpdate || hudState.lastAltPanelCompassMode || std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
-            drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
-            std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
-            hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
-            hudState.lastAltColor = altColor;
-            hudState.lastAltPanelCompassMode = false;
-        }
-    } else {
-        // Iránytű mód: a haladási irányt mutató nyíl kirajzolása
-        const bool hasFreshCourse = (c1_sharedGpsData.courseAgeMs < GPS_DATA_MAX_AGE);
-        float courseDeg = c1_sharedGpsData.courseDeg;
-        if (!std::isfinite(courseDeg)) {
-            courseDeg = 0.0f;
-        }
-        courseDeg = std::fmod(courseDeg, 360.0f);
-        if (courseDeg < 0.0f) {
-            courseDeg += 360.0f;
-        }
-
-        const bool hasUsableCourse = c1_sharedGpsData.locationValid && c1_sharedGpsData.speedValid && (courseDeg >= 0.0f) && (courseDeg <= 360.0f);
-        if (hasUsableCourse) {
-            compassHasKnownCourse = true;
-            compassLastKnownCourseDeg = courseDeg;
-        }
-
-        // Északot mutató nyíl a haladási irányhoz képest: 0°=felfelé, 90°=jobbra.
-        const float displayCourseDeg = compassHasKnownCourse ? compassLastKnownCourseDeg : 0.0f;
-        const float northAngleDeg = (displayCourseDeg == 0.0f) ? 0.0f : (360.0f - displayCourseDeg);
-        const uint16_t compassColor = (hasFreshCourse && hasUsableCourse) ? TFT_CYAN : tft.color565(95, 115, 130);
-
-        if (forceUpdate || !hudState.lastAltPanelCompassMode || std::fabs(northAngleDeg - hudState.lastCompassNorthDeg) >= 0.2f || compassColor != hudState.lastAltColor) {
-            drawCompassPanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, northAngleDeg, hasFreshCourse && hasUsableCourse, compassColor);
-            hudState.lastCompassNorthDeg = northAngleDeg;
-            hudState.lastAltColor = compassColor;
-            hudState.lastAltPanelCompassMode = true;
+            if (forceUpdate || !hudState.lastAltPanelCompassMode || std::fabs(northAngleDeg - hudState.lastCompassNorthDeg) >= 0.2f || compassColor != hudState.lastAltColor) {
+                drawCompassPanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, northAngleDeg, hasFreshCourse && hasUsableCourse, compassColor);
+                hudState.lastCompassNorthDeg = northAngleDeg;
+                hudState.lastAltColor = compassColor;
+                hudState.lastAltPanelCompassMode = true;
+            }
         }
     }
 
@@ -287,8 +586,8 @@ void ScreenMain::handleOwnLoop() {
     drawTrendGraph(forceUpdate);
 
     // Függőleges bar-ok adatai
-    const float voltageValue = config.data.externalVoltageMode ? c1_sharedSensorData.vBus : c1_sharedSensorData.vSys;
-    const float temperatureValue = config.data.externalTemperatureMode ? c1_sharedSensorData.externalTemperature : c1_sharedSensorData.coreTemperature;
+    const float voltageValue = dataVoltageValue;
+    const float temperatureValue = dataTemperatureValue;
 
     // Ellenőrizzük, hogy szükséges-e a függőleges bar-ok frissítése
     const bool voltageNeedsUpdate = forceUpdate || config.data.externalVoltageMode != hudState.lastVoltageMode || std::fabs(voltageValue - hudState.lastVoltageValue) > 0.02f;
@@ -314,8 +613,8 @@ void ScreenMain::handleOwnLoop() {
                                 config.data.externalVoltageMode ? VBUS_BARMETER_MAX : VSYS_BARMETER_MAX, // maxVal
                                 SENSOR_BAR_X,                                                            // x
                                 SENSOR_BAR_Y_BOTTOM,                                                     // y: sprite alsó éle
-                                25,                                                                      // bar-w
-                                10,                                                                      // bar-h
+                                20,                                                                      // bar-w
+                                8,                                                                       // bar-h
                                 1,                                                                       // gap
                                 8,                                                                       // n
                                 RED2GREEN);                                                              // color
@@ -330,8 +629,8 @@ void ScreenMain::handleOwnLoop() {
                                 TEMP_BARMETER_MAX,                                           // maxVal
                                 SENSOR_BAR_X_RIGHT,                                          // x: sprite szélesség beszámítva
                                 SENSOR_BAR_Y_BOTTOM,                                         // y: sprite alsó éle
-                                25,                                                          // bar-w
-                                10,                                                          // bar-h
+                                20,                                                          // bar-w
+                                8,                                                           // bar-h
                                 1,                                                           // gap
                                 8,                                                           // n
                                 BLUE2RED,                                                    // color
@@ -344,59 +643,49 @@ void ScreenMain::handleOwnLoop() {
         hudState.lastTemperatureMode = config.data.externalTemperatureMode;
     }
 
-    // Alsó információs sor: fix oszlopokban balra igazított HDOP és MAX érték.
-    char hdopValueText[16];
-    const bool hdopValid = (c1_sharedGpsData.hdop > 0.0f && c1_sharedGpsData.hdop < 99.0f);
-    if (hdopValid) {
-        snprintf(hdopValueText, sizeof(hdopValueText), "%.1f", c1_sharedGpsData.hdop);
-    } else {
-        snprintf(hdopValueText, sizeof(hdopValueText), "--");
-    }
-    const int maxSpeedDisplay = static_cast<int>(std::lroundf(maxSpeedSinceBoot));
+    if (!traffiResult.alertActive) {
+        // Alsó információs sor: fix oszlopokban balra igazított HDOP és MAX érték.
+        char hdopValueText[16];
+        const bool hdopValid = (dataHdop > 0.0f && dataHdop < 99.0f);
+        if (hdopValid) {
+            snprintf(hdopValueText, sizeof(hdopValueText), "%.1f", dataHdop);
+        } else {
+            snprintf(hdopValueText, sizeof(hdopValueText), "--");
+        }
+        const int maxSpeedDisplay = static_cast<int>(std::lroundf(maxSpeedSinceBoot));
 
-    char bottomText[128];
-    snprintf(bottomText, sizeof(bottomText), "H:%s|MX:%03d", hdopValueText, maxSpeedDisplay);
+        char bottomText[128];
+        snprintf(bottomText, sizeof(bottomText), "H:%s|MX:%03d", hdopValueText, maxSpeedDisplay);
 
-    // Alsó információs sor frissítése csak akkor, ha változott
-    if (std::strcmp(bottomText, hudState.lastBottomText) != 0) {
-        const uint16_t infoBg = tft.color565(6, 14, 22);
-        tft.fillRect(INFO_X + 2, INFO_Y + 2, INFO_W - 4, INFO_H - 4, infoBg);
+        // Alsó információs sor frissítése csak akkor, ha változott
+        if (std::strcmp(bottomText, hudState.lastBottomText) != 0) {
+            const uint16_t infoBg = tft.color565(6, 14, 22);
+            tft.fillRect(INFO_X + 2, INFO_Y + 2, INFO_W - 4, INFO_H - 4, infoBg);
 
-        tft.setFreeFont();
-        tft.setTextSize(1);
-        tft.setTextColor(tft.color565(170, 220, 255), infoBg);
-        tft.setTextDatum(ML_DATUM);
+            tft.setFreeFont();
+            tft.setTextSize(1);
+            tft.setTextColor(tft.color565(170, 220, 255), infoBg);
+            tft.setTextDatum(ML_DATUM);
 
-        // Középre igazított sor Y koordinátája
-        const int16_t rowY = INFO_Y + (INFO_H / 2);
+            // Középre igazított sor Y koordinátája
+            const int16_t rowY = INFO_Y + (INFO_H / 2);
 
-        // HDOP
-        char hdopColText[24];
-        const int16_t hdopColLeft = INFO_X + 8;
-        snprintf(hdopColText, sizeof(hdopColText), "HDOP: %s", hdopValueText);
-        tft.drawString(hdopColText, hdopColLeft, rowY);
+            // HDOP
+            char hdopColText[24];
+            const int16_t hdopColLeft = INFO_X + 8;
+            snprintf(hdopColText, sizeof(hdopColText), "HDOP: %s", hdopValueText);
+            tft.drawString(hdopColText, hdopColLeft, rowY);
 
-        // MAX sebesség
-        char maxColText[24];
-        const int16_t maxColLeft = INFO_X + 80;
-        snprintf(maxColText, sizeof(maxColText), "Max speed: %d", maxSpeedDisplay);
-        tft.drawString(maxColText, maxColLeft, rowY);
+            // MAX sebesség
+            char maxColText[24];
+            const int16_t maxColLeft = INFO_X + 80;
+            snprintf(maxColText, sizeof(maxColText), "Max speed: %d", maxSpeedDisplay);
+            tft.drawString(maxColText, maxColLeft, rowY);
 
-        // Alsó információs sor szövegének frissítése
-        std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
-        hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
-    }
-
-    // Traffipax közeledés / távolodás figyelmeztetés
-    const TraffipaxAlertController::ConfigSnapshot traffiCfg{config.data.gpsTraffiAlarmEnabled, config.data.gpsTraffiSirenAlarmEnabled, config.data.beeperEnabled, config.data.gpsTraffiAlarmDistance};
-    const auto traffiResult = traffipaxAlertController.update(c1_sharedGpsData.lat, c1_sharedGpsData.lng, c1_sharedGpsData.locationValid, traffiCfg, millis(), tft, traffipaxManager);
-    if (traffiResult.baseAreaNeedsRestore) {
-        drawTraffipaxBaseArea();
-    }
-    if (traffiResult.hudNeedsRepaint) {
-        hudState.staticPainted = false;
-        hudState.lastRedrawMs = 0;
-        forceRedraw = true;
+            // Alsó információs sor szövegének frissítése
+            std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
+            hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
+        }
     }
 }
 
@@ -525,7 +814,7 @@ void ScreenMain::drawContent() {
  */
 void ScreenMain::drawTraffipaxBaseArea() {
 
-    constexpr int16_t TRAFFI_ALERT_H = 48;
+    constexpr int16_t TRAFFI_ALERT_H = TraffipaxAlertController::ALERT_DRAW_HEIGHT;
     for (int16_t y = 0; y < TRAFFI_ALERT_H; y++) {
         const uint16_t bg = tft.color565(0, 40 + (y * 60) / tft.height(), 80 + (y * 100) / tft.height());
         tft.drawFastHLine(0, y, tft.width(), bg);
@@ -647,6 +936,7 @@ void ScreenMain::drawAltitudePanelValue(int16_t x, int16_t y, int16_t w, int16_t
  * @param valueColor Az iránytű színe
  */
 void ScreenMain::drawCompassPanelValue(int16_t x, int16_t y, int16_t w, int16_t h, float northAngleDeg, bool /*hasValidHeading*/, uint16_t valueColor) {
+
     const uint16_t panelBg = tft.color565(8, 16, 26);
     tft.setTextPadding(0);
 
@@ -765,8 +1055,6 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
     const uint16_t gridColor = graphSprite.color565(70, 70, 70);
     // Grafikon alapvonal színe
     const uint16_t baselineColor = graphSprite.color565(120, 120, 120);
-    // const uint16_t gridColor = graphSprite.color565(0, 18, 26);
-    // const uint16_t baselineColor = graphSprite.color565(0, 70, 104);
 
     const uint16_t titleColor = graphSprite.color565(150, 210, 240);
     const uint16_t mutedTextColor = graphSprite.color565(90, 130, 160);
@@ -882,18 +1170,6 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
                 graphSprite.drawPixel(x, y + 1, plotColor);
             }
         }
-
-        // if (prevX >= 0) { // Ha van előző pont, akkor a kitöltést és a görbét is rajzoljuk
-        //     graphSprite.drawLine(prevX, prevY, x, y, plotColor);
-        //     if (y + 1 < GRAPH_H) {
-        //         graphSprite.drawLine(prevX, prevY + 1, x, y + 1, plotColor);
-        //     }
-        // } else {                                    // Ha nincs előző pont, akkor csak a kitöltést rajzoljuk
-        //     graphSprite.drawPixel(x, y, plotColor); //
-        //     if (y + 1 < GRAPH_H) {
-        //         graphSprite.drawPixel(x, y + 1, plotColor);
-        //     }
-        // }
 
         prevX = x;
         prevY = y;
@@ -1125,12 +1401,11 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpd
         speedSprite.setTextFont(SPEED_VALUE_FONT);
         speedSprite.setTextSize(SPEED_VALUE_TEXT_SIZE);
 
-        // speedSprite.setTextColor(speedColor);
-        // speedSprite.drawString(speedText, hudState.speedValueW / 2, hudState.speedValueH / 2);
         const uint16_t glowColor = speedSprite.color565(0, 120, 180);
         const int16_t cx = hudState.speedValueW / 2;
         const int16_t cy = hudState.speedValueH / 2;
 
+        // Glow effekt kirajzolása a sebesség szám köré
         const int8_t offsets[][2] = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}};
         speedSprite.setTextColor(glowColor);
 
@@ -1165,7 +1440,7 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpd
         }
     }
 
-    // Sebesség szöveg kirajzolása
+    // Sebesség kirajzolása
     tft.setTextDatum(MC_DATUM);
     tft.setTextFont(SPEED_VALUE_FONT);
     tft.setTextSize(SPEED_VALUE_TEXT_SIZE);

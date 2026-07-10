@@ -4,9 +4,6 @@
 #include "ValueChangeDialog.h"
 #include "defines.h"
 
-// Demó mód (fájl-szintű állapot)
-static bool demoMode = false;
-
 void ScreenSystemSetup::layoutComponents() {
 
     // Függőlegesen egymás alá

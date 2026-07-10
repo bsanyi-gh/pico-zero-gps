@@ -92,7 +92,7 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
 
     // Függőleges sensor bar-ok pozíció és méret
     static constexpr int16_t SENSOR_BAR_X = 0;
-    static constexpr int16_t SENSOR_BAR_Y_BOTTOM = 170;
+    static constexpr int16_t SENSOR_BAR_Y_BOTTOM = 175;
     static constexpr int16_t SENSOR_BAR_W = 67;
     static constexpr int16_t SENSOR_BAR_H = 118;
     static constexpr int16_t SENSOR_BAR_Y_TOP = SENSOR_BAR_Y_BOTTOM - SENSOR_BAR_H;

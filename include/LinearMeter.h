@@ -123,6 +123,7 @@ void verticalLinearMeter(TFT_eSprite *sprite, int meterHeight, int meterWidth, c
     char buf[20];
     constexpr int16_t DISPLAY_W = 320;
     constexpr int16_t DISPLAY_H = 240;
+    constexpr int8_t DECIMAL_ACCURACY = 1; // Tizedesjegyek száma az aktuális érték kiírásakor
 
     const int16_t drawX = x;
     const int16_t drawY = y - meterHeight;
@@ -204,7 +205,7 @@ void verticalLinearMeter(TFT_eSprite *sprite, int meterHeight, int meterWidth, c
         } else if (b == n) {
             dtostrf(maxVal, 0, 1, buf); // Max érték
         } else if (b == barVal) {
-            dtostrf(val, 0, 2, buf); // Aktuális érték
+            dtostrf(val, 0, DECIMAL_ACCURACY, buf); // Aktuális érték
         }
 
         // Bar szöveg kiírása
@@ -220,12 +221,12 @@ void verticalLinearMeter(TFT_eSprite *sprite, int meterHeight, int meterWidth, c
         }
     }
 
-    // 4. Aktuális érték kiírása a bar aljára
-    dtostrf(val, 0, 2, buf);
+    // 4. Aktuális érték kiírása a bar aljára nagyobb betűmérettel
+    dtostrf(val, 0, DECIMAL_ACCURACY, buf);
     sprite->setTextSize(1);
     sprite->setTextDatum(mirrored ? BR_DATUM : BL_DATUM);
     sprite->setTextColor(TFT_ORANGE, bgColorForGlobalY(drawY + meterHeight - 1));
-    sprite->drawString(buf, mirrored ? meterWidth : 0, meterHeight + 3, 2); // TFT_eSPI Font2
+    sprite->drawString(buf, mirrored ? meterWidth : 0, meterHeight - 5, 2); // TFT_eSPI Font2
 
     // Sprite kirajzolása a kijelzőre
     sprite->pushSprite(drawX, drawY);

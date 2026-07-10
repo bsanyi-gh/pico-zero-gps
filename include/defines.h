@@ -100,3 +100,6 @@
 
 //--- Array Utils ---
 #define ARRAY_ITEM_COUNT(array) (sizeof(array) / sizeof(array[0]))
+
+// Közös demó mód flag (main.cpp definiálja).
+extern bool demoMode;
