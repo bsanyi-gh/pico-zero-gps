@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 //--- Debug ---
-#define __DEBUG // Debug mód vezérlése
+// #define __DEBUG // Debug mód vezérlése
 
 //--- Debug ---
 #ifdef __DEBUG

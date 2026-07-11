@@ -157,45 +157,55 @@ void TraffipaxAlertController::drawAlert(TFT_eSPI &tft, const TraffipaxManager::
  * @return A következő riasztás állapota
  *
  */
-TraffipaxAlertController::AlertState TraffipaxAlertController::calculateState(AlertState currentState, double currentDistance, double lastDistance, uint16_t alarmDistanceM) {
-    const double delta = currentDistance - lastDistance;
-    const bool isApproaching = delta <= -DISTANCE_EPSILON_M;
-    const bool isDeparting = delta >= DISTANCE_EPSILON_M;
-    const bool isNear = currentDistance <= alarmDistanceM;
+TraffipaxAlertController::AlertState TraffipaxAlertController::calculateState(double currentDistance, uint16_t alarmDistanceM) {
+    const double delta = currentDistance - alertState.lastDistance;
 
-    if (currentState == AlertState::INACTIVE || isApproaching) {
-        return AlertState::APPROACHING;
+    // Trend számlálók frissítése
+    if (delta <= -DISTANCE_EPSILON_M) {
+        alertState.approachCount++;
+        alertState.departCount = 0;
+    } else if (delta >= DISTANCE_EPSILON_M) {
+        alertState.departCount++;
+        alertState.approachCount = 0;
     }
+    // 10 m-nél kisebb változás esetén nem módosítjuk a számlálókat
 
-    // Irányváltás hiszterézissel: a váltáshoz nagyobb távolságdelta kell,
-    // mint a sima "azonos irányban maradáshoz". Ettől normál/demó módban sem keveredik.
-    if (currentState == AlertState::APPROACHING) {
-        if (delta >= SWITCH_TO_DEPART_DELTA_M) {
-            return AlertState::DEPARTING;
-        }
-        return AlertState::APPROACHING;
-    }
+    const bool confirmedApproach = (alertState.approachCount >= 2);
+    const bool confirmedDepart = (alertState.departCount >= 2);
 
-    if (currentState == AlertState::DEPARTING) {
-        if (delta <= -SWITCH_TO_APPROACH_DELTA_M) {
+    switch (alertState.currentState) {
+        case AlertState::INACTIVE:
+            if (confirmedApproach)
+                return AlertState::APPROACHING;
+
+            if (confirmedDepart)
+                return AlertState::DEPARTING;
+
+            return AlertState::INACTIVE;
+
+        case AlertState::APPROACHING:
+            if (confirmedDepart)
+                return AlertState::DEPARTING;
+
             return AlertState::APPROACHING;
-        }
-        return AlertState::DEPARTING;
+
+        case AlertState::DEPARTING:
+            if (confirmedApproach)
+                return AlertState::APPROACHING;
+
+            return AlertState::DEPARTING;
+
+        case AlertState::NEARBY_STOPPED:
+            if (confirmedApproach)
+                return AlertState::APPROACHING;
+
+            if (confirmedDepart)
+                return AlertState::DEPARTING;
+
+            return AlertState::NEARBY_STOPPED;
     }
 
-    // Ha nincs egyértelmű távolságtrend, tartsuk az előző irányállapotot,
-    // így demó módban sem billeg piros/sárga között.
-    if (isNear && (currentState == AlertState::APPROACHING || currentState == AlertState::DEPARTING)) {
-        return currentState;
-    }
-    if (isNear && isDeparting) {
-        return AlertState::DEPARTING;
-    }
-    if (isNear) {
-        return AlertState::APPROACHING;
-    }
-
-    return currentState;
+    return alertState.currentState;
 }
 
 /**
@@ -283,18 +293,29 @@ TraffipaxAlertController::UpdateResult TraffipaxAlertController::update(double c
 
     outOfRangeStart = 0;
 
+    // Ha nincs aktív trafipax, vagy az aktív trafipax már nem a legközelebbi, akkor frissítjük az aktív trafipaxot
     if (alertState.currentState == AlertState::INACTIVE || alertState.activeTraffipax == nullptr) {
         alertState.activeTraffipax = closestTraffipax;
     }
 
+    // A legközelebbi trafipax távolságának kiszámítása a jelenlegi pozícióhoz képest
     const double activeDistance = distanceToRecordMeters(currentLat, currentLon, alertState.activeTraffipax);
 
-    const AlertState newState = calculateState(alertState.currentState, activeDistance, alertState.lastDistance, cfg.alarmDistanceM);
+    // Állapotváltozás kiszámítása a távolság és az előző állapot alapján
+    const AlertState newState = calculateState(activeDistance, cfg.alarmDistanceM);
+
+    // Állapotváltozás esetén frissítjük az állapotot és a riasztás idejét
     if (newState != alertState.currentState) {
         const bool canChangeState = (alertState.currentState == AlertState::INACTIVE) || ((currentTime - alertState.lastStateChangeTime) >= STATE_CHANGE_HOLD_MS);
+
         if (canChangeState) {
             alertState.currentState = newState;
             alertState.lastStateChangeTime = currentTime;
+
+            // Trend számlálók nullázása
+            alertState.approachCount = 0;
+            alertState.departCount = 0;
+
             if (newState != AlertState::APPROACHING) {
                 stopSiren();
             }

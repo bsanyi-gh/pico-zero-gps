@@ -58,6 +58,9 @@ class TraffipaxAlertController {
         double lastDistance = 999999.0;
         unsigned long lastStateChangeTime = 0;
         unsigned long lastSirenTime = 0;
+
+        uint8_t approachCount = 0;
+        uint8_t departCount = 0;
     };
 
     /**
@@ -83,7 +86,7 @@ class TraffipaxAlertController {
     unsigned long outOfRangeStart = 0;
 
     static void drawAlert(TFT_eSPI &tft, const TraffipaxManager::TraffipaxRecord *traffipax, double distance, AlertState state);
-    static AlertState calculateState(AlertState currentState, double currentDistance, double lastDistance, uint16_t alarmDistanceM);
+    AlertState calculateState(double currentDistance, uint16_t alarmDistanceM);
 
     void stopSiren();
     void startSiren(unsigned long currentTime, bool beeperEnabled);

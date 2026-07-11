@@ -46,7 +46,7 @@ class UIButton : public UIComponent {
     };
 
     // Gomb logikai állapotai (a Disabled állapotot az ősosztály kezeli)
-    enum class ButtonState { Off, On, CurrentActive };
+    enum class ButtonState { Off, On, CurrentActive, Disabled };
 
   private:
     static constexpr uint8_t CORNER_RADIUS = 5;
