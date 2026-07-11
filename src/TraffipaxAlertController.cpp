@@ -168,39 +168,46 @@ TraffipaxAlertController::AlertState TraffipaxAlertController::calculateState(do
         alertState.departCount++;
         alertState.approachCount = 0;
     }
-    // 10 m-nél kisebb változás esetén nem módosítjuk a számlálókat
 
+    // 10 m-nél kisebb változás esetén nem módosítjuk a számlálókat
     const bool confirmedApproach = (alertState.approachCount >= 2);
     const bool confirmedDepart = (alertState.departCount >= 2);
 
+    // Állapotváltozás logika
     switch (alertState.currentState) {
         case AlertState::INACTIVE:
-            if (confirmedApproach)
-                return AlertState::APPROACHING;
 
-            if (confirmedDepart)
+            // Inaktív állapotból csak akkor lépünk ki, ha a közeledés vagy távolodás megerősített
+            if (confirmedApproach) {
+                return AlertState::APPROACHING;
+            } else if (confirmedDepart) {
                 return AlertState::DEPARTING;
+            }
 
             return AlertState::INACTIVE;
 
+            // Ha a közeledés megerősített, akkor közeledés állapotba lépünk
         case AlertState::APPROACHING:
-            if (confirmedDepart)
+            if (confirmedDepart) {
                 return AlertState::DEPARTING;
-
+            }
             return AlertState::APPROACHING;
 
+            // Ha a távolodás megerősített, akkor távolodás állapotba lépünk
         case AlertState::DEPARTING:
-            if (confirmedApproach)
+            if (confirmedApproach) {
                 return AlertState::APPROACHING;
+            }
 
             return AlertState::DEPARTING;
 
+            // Ha a közeledés megerősített, akkor közeledés állapotba lépünk, ha a távolodás megerősített, akkor távolodás állapotba lépünk
         case AlertState::NEARBY_STOPPED:
-            if (confirmedApproach)
+            if (confirmedApproach) {
                 return AlertState::APPROACHING;
-
-            if (confirmedDepart)
+            } else if (confirmedDepart) {
                 return AlertState::DEPARTING;
+            }
 
             return AlertState::NEARBY_STOPPED;
     }
