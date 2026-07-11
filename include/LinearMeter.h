@@ -215,7 +215,7 @@ void verticalLinearMeter(TFT_eSprite *sprite, int meterHeight, int meterWidth, c
             sprite->setTextDatum(mirrored ? TR_DATUM : TL_DATUM);
 
             // Bar szöveg pozíciója
-            int textX = mirrored ? meterWidth - w - 8 : w + 8;
+            int textX = mirrored ? meterWidth - w - 3 : w + 3;
             int textY = barY + h / 2 - 4;
             sprite->drawString(buf, textX, textY, 1);
         }

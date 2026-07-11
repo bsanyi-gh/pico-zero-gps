@@ -39,37 +39,33 @@ void ScreenDebugSetup::layoutComponents() {
     // GPS On Serial
     row++;
 
-    auto gpsOnSerialButton = std::make_shared<UIButton>(      //
-        11,                                                   // id
-        Rect(btnX, btnY + row * (btnH + btnGap), btnW, btnH), // rect
-        "GPS On Serial",                                      // label
-        UIButton::ButtonType::Toggleable,                     // type
-#ifdef __DEBUG
+    auto gpsOnSerialButton = std::make_shared<UIButton>(                                         //
+        11,                                                                                      // id
+        Rect(btnX, btnY + row * (btnH + btnGap), btnW, btnH),                                    // rect
+        "GPS On Serial",                                                                         // label
+        UIButton::ButtonType::Toggleable,                                                        // type
         config.data.debugGpsSerialData ? UIButton::ButtonState::On : UIButton::ButtonState::Off, // Kezdeti állapot
-#else
-        UIButton::ButtonState::Disabled, // Ha nincs Serial, akkor nincs értelme
-#endif
         [this](const UIButton::ButtonEvent &event) {
             if (event.state == UIButton::EventButtonState::On || event.state == UIButton::EventButtonState::Off) {
                 config.data.debugGpsSerialData = event.state == UIButton::EventButtonState::On;
                 config.checkSave();
             }
         });
+#if not defined(__DEBUG)
+    // Ha nincs Serial, akkor nincs értelme a GPS debug logolásnak
+    gpsOnSerialButton->setDisabled(true);
+#endif
     gpsOnSerialButton->setUseMiniFont(false);
     addChild(gpsOnSerialButton);
 
     // SatDB on Serial
     row++;
-    auto satDbOnSerialButton = std::make_shared<UIButton>(    //
-        12,                                                   // id
-        Rect(btnX, btnY + row * (btnH + btnGap), btnW, btnH), // rect
-        "SatDB On Serial",                                    // label
-        UIButton::ButtonType::Toggleable,                     // type
-#ifdef __DEBUG
+    auto satDbOnSerialButton = std::make_shared<UIButton>(                                               //
+        12,                                                                                              // id
+        Rect(btnX, btnY + row * (btnH + btnGap), btnW, btnH),                                            // rect
+        "SatDB On Serial",                                                                               // label
+        UIButton::ButtonType::Toggleable,                                                                // type
         config.data.debugGpsSatellitesDatabase ? UIButton::ButtonState::On : UIButton::ButtonState::Off, // Kezdeti állapot
-#else
-        UIButton::ButtonState::Disabled, // Ha nincs Serial, akkor nincs értelme
-#endif
         [this](const UIButton::ButtonEvent &event) {
             if (event.state == UIButton::EventButtonState::On || event.state == UIButton::EventButtonState::Off) {
                 config.data.debugGpsSatellitesDatabase = event.state == UIButton::EventButtonState::On;
@@ -77,6 +73,10 @@ void ScreenDebugSetup::layoutComponents() {
             }
         });
     satDbOnSerialButton->setUseMiniFont(false);
+#if not defined(__DEBUG)
+    // Ha nincs Serial, akkor nincs értelme a SatDB debug logolásnak
+    satDbOnSerialButton->setDisabled(true);
+#endif
     addChild(satDbOnSerialButton);
 
     // Back gomb jobb alsó sarokban

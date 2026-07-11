@@ -1009,7 +1009,7 @@ void ScreenMain::ensureGraphSpriteReady() {
 void ScreenMain::recordGraphSample(float speedKmph, bool speedValid, float altitudeM, bool altitudeValid, uint32_t nowMs) {
 
     static uint32_t graphLastSampleMs = 0;
-    if (graphSampleCount > 0 && !Utils::timeHasPassed(graphLastSampleMs, GRAPH_SAMPLE_INTERVAL_MS)) {
+    if (graphSampleCount > 0 && !Utils::timeHasPassed(graphLastSampleMs, TREND_GRAPH_SAMPLE_INTERVAL_MS)) {
         return;
     }
 
@@ -1122,7 +1122,7 @@ void ScreenMain::drawTrendGraph(bool forceUpdate) {
     // Ha nincs érvényes minta, akkor a "collecting samples" üzenet jelenik meg
     if (graphSampleCount == 0 || maxValue <= 0) {
         graphSprite.setTextColor(mutedTextColor, bgColorForGlobalY(GRAPH_Y + 16));
-        graphSprite.drawString("collecting " + String(GRAPH_SAMPLE_INTERVAL_MS / 1000) + " secs samples", 4, 20);
+        graphSprite.drawString("collecting " + String(TREND_GRAPH_SAMPLE_INTERVAL_MS / 1000) + " secs samples", 4, 20);
         graphSprite.pushSprite(GRAPH_X, GRAPH_Y);
         graphDirty = false;
         return;
@@ -1309,13 +1309,10 @@ void ScreenMain::drawStaticHudBackground() {
  * hogy a widget megfelelően illeszkedjen a kijelzőn.
  */
 void ScreenMain::updateSpeedValueLayoutForFont() {
-    constexpr int16_t HORIZONTAL_INSET = 3;
-    constexpr int16_t PAD_X = 10;
-    constexpr int16_t PAD_Y = 8;
     constexpr int16_t RESERVED_FOR_UNIT = 28;
     constexpr int16_t MIN_W = 96;
     constexpr int16_t MIN_H = 54;
-    constexpr int16_t SPEED_INNER_W = SPEED_W - (HORIZONTAL_INSET * 2);
+    constexpr int16_t SPEED_INNER_W = SPEED_W;
 
     // A sprite tényleges fontbeállításával mérünk, így a méret mindig konzisztens.
     speedSprite.setTextFont(SPEED_VALUE_FONT);
@@ -1324,14 +1321,14 @@ void ScreenMain::updateSpeedValueLayoutForFont() {
     int16_t textH = speedSprite.fontHeight();
 
     if (textW <= 0) {
-        textW = MIN_W - (PAD_X * 2);
+        textW = MIN_W;
     }
     if (textH <= 0) {
-        textH = MIN_H - (PAD_Y * 2);
+        textH = MIN_H;
     }
 
-    int16_t desiredW = textW + PAD_X * 2;
-    int16_t desiredH = textH + PAD_Y * 2;
+    int16_t desiredW = textW;
+    int16_t desiredH = textH;
 
     const int16_t maxH = SPEED_H - RESERVED_FOR_UNIT;
     desiredW = static_cast<int16_t>(std::clamp(desiredW, MIN_W, SPEED_INNER_W));
@@ -1339,7 +1336,7 @@ void ScreenMain::updateSpeedValueLayoutForFont() {
 
     hudState.speedValueW = desiredW;
     hudState.speedValueH = desiredH;
-    hudState.speedValueX = SPEED_X + HORIZONTAL_INSET + (SPEED_INNER_W - desiredW) / 2;
+    hudState.speedValueX = SPEED_X + (SPEED_INNER_W - desiredW) / 2;
     hudState.speedValueY = SPEED_Y + ((maxH - desiredH) / 2);
 }
 
@@ -1386,6 +1383,7 @@ void ScreenMain::drawSpeedWidget(float speedKmph, bool speedValid, bool forceUpd
     ensureSpeedSpriteReady();
 
     if (hudState.speedSpriteReady) {
+
         // Háttér kirajzolása a sebesség szám területére sprite-ra
         for (int16_t y = 0; y < hudState.speedValueH; y++) {
             const int16_t globalY = hudState.speedValueY + y;
