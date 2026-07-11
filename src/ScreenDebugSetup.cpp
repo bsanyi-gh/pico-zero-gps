@@ -104,5 +104,4 @@ void ScreenDebugSetup::drawContent() {
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.drawString("Debug Settings", tft.width() / 2, 20);
     tft.setFreeFont();
-    // ...ide jönnek majd a beállítási gombok/ValueChangeDialog...
 }
