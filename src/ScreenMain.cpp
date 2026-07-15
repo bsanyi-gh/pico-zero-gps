@@ -356,6 +356,10 @@ void ScreenMain::activate() {
 
     // Ős activate() metódus hívása
     UIScreen::activate();
+
+    // a képernyőváltás után biztos újrarajzolódik a HUD, ezért a topHudInvalid flag-et true-ra állítjuk
+    topHudInvalid = true;
+    lastTraffiAlertState = false;
 }
 
 /**
@@ -430,6 +434,15 @@ void ScreenMain::handleOwnLoop() {
     // Traffipax közeledés / távolodás figyelmeztetés frissítése minden ciklusban.
     const TraffipaxAlertController::ConfigSnapshot traffiCfg{config.data.gpsTraffiAlarmEnabled, config.data.gpsTraffiSirenAlarmEnabled, config.data.beeperEnabled, config.data.gpsTraffiAlarmDistance};
     const auto traffiResult = traffipaxAlertController.update(dataLat, dataLon, dataLocationValid, traffiCfg, nowMs, tft, traffipaxManager);
+
+    // Ha a Traffipax riasztás állapota megváltozott, a felső HUD tartalmát érvénytelenítjük, hogy újrarajzolódjon.
+    if (lastTraffiAlertState != traffiResult.alertActive) {
+        lastTraffiAlertState = traffiResult.alertActive;
+
+        // A felső HUD tartalma biztosan érvénytelenné vált.
+        topHudInvalid = true;
+    }
+
     if (traffiResult.baseAreaNeedsRestore) {
         drawTraffipaxBaseArea();
     }
@@ -437,6 +450,7 @@ void ScreenMain::handleOwnLoop() {
         hudState.staticPainted = false;
         hudState.lastRedrawMs = 0;
         forceRedraw = true;
+        topHudInvalid = true;
     }
 
     // A sebesség értékének lekérése a GPS adatokból
@@ -487,8 +501,13 @@ void ScreenMain::handleOwnLoop() {
         char trackMetaText[64];
         snprintf(trackMetaText, sizeof(trackMetaText), "Q:%s|M:%s", GpsManager::qualityToString(dataFixQuality).c_str(), GpsManager::modeToString(dataFixMode).c_str());
         const uint16_t satColor = dataLocationValid ? TFT_GREEN : TFT_DARKGREY;
-        const bool satNeedsUpdate = std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor;
-        const bool trackMetaNeedsUpdate = std::strcmp(trackMetaText, hudState.lastTrackMetaText) != 0;
+
+        // A felső HUD panel frissítése, ha szükséges
+        const bool satNeedsUpdate = topHudInvalid || std::strcmp(satText, hudState.lastSatText) != 0 || satColor != hudState.lastSatColor;
+
+        // A felső HUD panel frissítése, ha szükséges
+        const bool trackMetaNeedsUpdate = topHudInvalid || std::strcmp(trackMetaText, hudState.lastTrackMetaText) != 0;
+
         if (satNeedsUpdate || trackMetaNeedsUpdate) {
             const String quality = "Q: " + GpsManager::qualityToString(dataFixQuality);
             const String mode = "M: " + GpsManager::modeToString(dataFixMode);
@@ -523,7 +542,7 @@ void ScreenMain::handleOwnLoop() {
             }
         }
         const uint16_t dateTimeColor = config.data.dateTimeModeDate ? (dataDateValid ? TFT_CYAN : TFT_DARKGREY) : (dataTimeValid ? TFT_CYAN : TFT_DARKGREY);
-        if (std::strcmp(dateTimeText, hudState.lastDateTimeText) != 0 || dateTimeColor != hudState.lastDateTimeColor) {
+        if (topHudInvalid || std::strcmp(dateTimeText, hudState.lastDateTimeText) != 0 || dateTimeColor != hudState.lastDateTimeColor) {
             drawHudPanelValue(DATETIME_X, DATETIME_Y, DATETIME_W, DATETIME_H, dateTimeText, dateTimeColor);
 
             std::strncpy(hudState.lastDateTimeText, dateTimeText, sizeof(hudState.lastDateTimeText) - 1);
@@ -542,7 +561,7 @@ void ScreenMain::handleOwnLoop() {
             }
 
             const uint16_t altColor = dataAltitudeValid ? TFT_CYAN : TFT_DARKGREY;
-            if (forceUpdate || hudState.lastAltPanelCompassMode || std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
+            if (topHudInvalid || forceUpdate || hudState.lastAltPanelCompassMode || std::strcmp(altText, hudState.lastAltText) != 0 || altColor != hudState.lastAltColor) {
                 drawAltitudePanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, altText, altColor);
                 std::strncpy(hudState.lastAltText, altText, sizeof(hudState.lastAltText) - 1);
                 hudState.lastAltText[sizeof(hudState.lastAltText) - 1] = '\0';
@@ -572,7 +591,7 @@ void ScreenMain::handleOwnLoop() {
             const float northAngleDeg = (displayCourseDeg == 0.0f) ? 0.0f : (360.0f - displayCourseDeg);
             const uint16_t compassColor = (hasFreshCourse && hasUsableCourse) ? TFT_CYAN : tft.color565(95, 115, 130);
 
-            if (forceUpdate || !hudState.lastAltPanelCompassMode || std::fabs(northAngleDeg - hudState.lastCompassNorthDeg) >= 0.2f || compassColor != hudState.lastAltColor) {
+            if (topHudInvalid || forceUpdate || !hudState.lastAltPanelCompassMode || std::fabs(northAngleDeg - hudState.lastCompassNorthDeg) >= 0.2f || compassColor != hudState.lastAltColor) {
                 drawCompassPanelValue(ALT_X, ALT_Y, ALT_W, ALT_H, northAngleDeg, hasFreshCourse && hasUsableCourse, compassColor);
                 hudState.lastCompassNorthDeg = northAngleDeg;
                 hudState.lastAltColor = compassColor;
@@ -688,6 +707,9 @@ void ScreenMain::handleOwnLoop() {
             std::strncpy(hudState.lastBottomText, bottomText, sizeof(hudState.lastBottomText) - 1);
             hudState.lastBottomText[sizeof(hudState.lastBottomText) - 1] = '\0';
         }
+
+        // A felső HUD tartalma érvényes, ezért a topHudInvalid flag-et false-ra állítjuk
+        topHudInvalid = false;
     }
 }
 

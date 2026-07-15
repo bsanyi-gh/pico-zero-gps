@@ -111,6 +111,10 @@ class ScreenMain : public UIScreen, public ButtonsGroupManager<ScreenMain> {
     static constexpr int16_t GRAPH_H = 40;                  // A grafikon magassága 50 pixel
     static constexpr int16_t GRAPH_SAMPLE_INVALID = -32768; // Érvénytelen mintajelzés a grafikon mintákhoz
 
+    // Riasztás panel és HUD állapot
+    bool topHudInvalid = true;         // a felső HUD-ot újra kell rajzolni.
+    bool lastTraffiAlertState = false; // állapotváltás detektálására.
+
     /**
      * @brief A trend grafikon megjelenítési módját meghatározó enum
      */

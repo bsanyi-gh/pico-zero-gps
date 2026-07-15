@@ -4,6 +4,8 @@
 #include "TraffipaxAlertController.h"
 #include "pins.h"
 
+#define TRAFFI_DEPART_CLEAR_DISTANCE_M 600.0 // Ennyi méter távolság után töröljük a riasztást, ha a jármű távolodik a trafipax-tól.
+
 namespace {
 double distanceToRecordMeters(double lat, double lon, const TraffipaxManager::TraffipaxRecord *rec) {
     if (rec == nullptr) {
@@ -272,7 +274,14 @@ TraffipaxAlertController::UpdateResult TraffipaxAlertController::update(double c
     const TraffipaxManager::TraffipaxRecord *trackedTraffipax = (alertState.activeTraffipax != nullptr) ? alertState.activeTraffipax : closestTraffipax;
     const double trackedDistance = distanceToRecordMeters(currentLat, currentLon, trackedTraffipax);
 
-    if (trackedDistance > cfg.alarmDistanceM) {
+    // A riasztás távolságának meghatározása a konfiguráció alapján
+    uint16_t clearDistance = cfg.alarmDistanceM;
+    if (alertState.currentState == AlertState::DEPARTING) {
+        clearDistance = TRAFFI_DEPART_CLEAR_DISTANCE_M;
+    }
+
+    // Ha a legközelebbi trafipax távolsága meghaladja a riasztási távolságot, akkor visszaállítjuk az állapotot inaktívra
+    if (trackedDistance > clearDistance) {
         if (outOfRangeStart == 0) {
             outOfRangeStart = currentTime;
         }
